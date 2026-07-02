@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Caddy</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root {
+    --lime: #d4ed3d;
+    --lime-dim: rgba(212, 237, 61, 0.55);
+    --hud: rgba(14, 18, 10, 0.78);
+    --ink: #f2f4ec;
+    --muted: #98a48d;
+    --card: #1a2114;
+    --line: #2f3a26;
+    --field: #131a0e;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: #0b0e08; overflow: hidden; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink);
+    user-select: none;
+  }
+
+  #mapWrap { position: fixed; inset: 0; }
+  #map { position: absolute; inset: 0; background: #0b0e08; }
+  .leaflet-container { background: #0b0e08; }
+
+  /* ---------- HUD ---------- */
+  .hudPanel { position: absolute; z-index: 900; pointer-events: none; }
+  .hudBtn {
+    width: 48px; height: 48px;
+    border-radius: 14px;
+    background: var(--hud);
+    border: 1.5px solid var(--lime-dim);
+    color: #fff; font-size: 21px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+
+  #fcbPanel {
+    top: calc(10px + var(--safe-top)); left: 10px;
+    background: var(--hud);
+    border: 1.5px solid var(--lime-dim);
+    border-radius: 16px;
+    padding: 6px 14px;
+    text-align: right;
+    line-height: 1.15;
+  }
+  #fcbPanel .bf { color: #fff; font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  #fcbPanel .c  { color: var(--lime); font-size: 32px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  #fcbPanel .lbl { font-size: 13px; font-weight: 600; color: #cfd8bf; margin-left: 3px; }
+
+  #gpsBtn {
+    position: absolute; z-index: 950;
+    top: calc(10px + var(--safe-top)); right: 10px;
+    font-size: 14px; font-weight: 700; padding: 10px 14px;
+    border: 1.5px solid var(--lime-dim); border-radius: 20px;
+    background: var(--hud); color: var(--ink);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  #gpsBtn.on { color: var(--lime); border-color: var(--lime); }
+
+  #sideCol {
+    position: absolute; z-index: 950;
+    top: calc(70px + var(--safe-top)); right: 10px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+
+  #markBtn {
+    position: absolute; z-index: 950;
+    right: 10px; bottom: calc(78px + var(--safe-bottom));
+    width: 58px; height: 58px; border-radius: 18px;
+    background: var(--lime); border: none;
+    color: #141a08; font-size: 26px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.5);
+  }
+  #markBtn:disabled { opacity: 0.35; }
+  #markBtn.flash { background: #fff; }
+
+  #clubPill {
+    position: absolute; z-index: 900; pointer-events: none;
+    bottom: calc(78px + var(--safe-bottom)); left: 50%; transform: translateX(-50%);
+    background: var(--hud);
+    border: 1.5px solid var(--lime-dim);
+    border-radius: 20px;
+    padding: 7px 24px;
+    text-align: center;
+    white-space: nowrap;
+    max-width: 70vw;
+  }
+  #clubPill .club { font-size: 27px; font-weight: 800; color: var(--lime); line-height: 1.05; }
+  #clubPill .opt  { font-size: 13px; font-weight: 600; color: #e8ecdc; }
+  #clubPill .alt  { font-size: 11px; font-weight: 600; color: #b7c29f; margin-top: 1px; white-space: normal; }
+
+  #chipRow {
+    position: absolute; z-index: 900;
+    bottom: calc(10px + var(--safe-bottom)); left: 10px; right: 10px;
+    display: flex; gap: 8px; justify-content: space-between;
+  }
+  .mchip {
+    background: var(--hud);
+    border: 1.5px solid var(--lime-dim);
+    border-radius: 14px;
+    padding: 5px 13px;
+    color: #fff; font-weight: 800; font-size: 16px;
+    text-align: center; line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+  }
+  .mchip small { display: block; font-weight: 600; font-size: 11px; color: #c9d4a3; }
+  .mchip .lime { color: var(--lime); }
+
+  #hintToast {
+    position: absolute; z-index: 960; pointer-events: none;
+    top: calc(10px + var(--safe-top)); left: 50%; transform: translateX(-50%);
+    background: var(--hud);
+    border: 1.5px solid var(--lime-dim);
+    border-radius: 12px;
+    padding: 8px 14px;
+    font-size: 13px; font-weight: 600; color: #fff;
+    max-width: 60vw; text-align: center;
+    transition: opacity 0.4s;
+  }
+
+  /* ---------- map markers ---------- */
+  .youDot {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: #4c9aff; border: 3px solid #fff;
+    box-shadow: 0 0 8px rgba(0,0,0,0.6);
+  }
+  .flagDot {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #fff; border: 3px solid #141a08;
+    box-shadow: 0 0 6px rgba(0,0,0,0.5);
+  }
+  .flagBadge {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: rgba(20, 30, 14, 0.55);
+    border: 2px solid var(--lime);
+    color: #fff; font-size: 19px;
+    display: flex; align-items: center; justify-content: center;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 8px rgba(0,0,0,0.4);
+  }
+  .ballDot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #fff; border: 2px solid #111;
+  }
+  .greenLabel {
+    color: #ffffffd9; font-size: 11px; font-weight: 800;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+    text-align: center; line-height: 14px;
+  }
+  .distChip {
+    display: inline-block;
+    transform: translate(-50%, -50%);
+    background: var(--hud);
+    color: #fff;
+    font-size: 15px; font-weight: 800;
+    padding: 4px 12px;
+    border-radius: 14px;
+    border: 1.5px solid var(--lime-dim);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .suggestChip {
+    display: inline-flex; align-items: center; gap: 7px;
+    transform: translate(-50%, -50%);
+    background: var(--hud);
+    border: 1.5px solid var(--lime-dim);
+    border-radius: 16px;
+    padding: 5px 13px;
+    white-space: nowrap;
+  }
+  .suggestChip .ring {
+    width: 22px; height: 22px; border-radius: 50%;
+    border: 2.5px solid var(--lime);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .suggestChip .ring::after {
+    content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--lime);
+  }
+  .suggestChip .txt { text-align: left; line-height: 1.05; }
+  .suggestChip .txt b { color: #fff; font-size: 18px; font-weight: 800; display: block; }
+  .suggestChip .txt small { color: #d7dfc9; font-size: 11px; font-weight: 600; }
+
+  /* ---------- sheets ---------- */
+  #backdrop {
+    position: fixed; inset: 0; z-index: 1900;
+    background: rgba(0,0,0,0.55);
+  }
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 2000;
+    background: var(--card); border-top: 2px solid var(--lime);
+    border-radius: 18px 18px 0 0;
+    padding: 14px 14px calc(24px + var(--safe-bottom));
+    max-width: 480px; margin: 0 auto;
+    max-height: 72vh; overflow-y: auto;
+    box-shadow: 0 -6px 24px rgba(0,0,0,0.6);
+  }
+  .sheetHead {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px;
+  }
+  .sheetHead h2 { font-size: 17px; color: var(--ink); }
+  .sheetHead button {
+    border: none; background: var(--field); color: var(--muted);
+    width: 34px; height: 34px; border-radius: 10px; font-size: 16px;
+  }
+  .hidden { display: none !important; }
+
+  label.section {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin: 12px 0 6px;
+  }
+  .seg { display: flex; gap: 6px; }
+  .seg button, .chips button {
+    flex: 1; font-size: 15px; font-weight: 600; padding: 11px 4px;
+    border: 1.5px solid var(--line); border-radius: 10px;
+    background: var(--field); color: var(--ink);
+  }
+  .seg button.on, .chips button.on {
+    background: rgba(212,237,61,0.16);
+    border-color: var(--lime);
+    color: var(--lime);
+  }
+  .chips { display: flex; gap: 6px; margin-top: 6px; }
+
+  #yardage {
+    width: 100%;
+    font-size: 32px; font-weight: 800; text-align: center;
+    border: 2px solid var(--line); border-radius: 12px;
+    padding: 6px;
+    background: var(--field); color: var(--ink);
+  }
+  #yardage:focus { outline: none; border-color: var(--lime); }
+
+  .bagRow { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .bagRow input[type=text] {
+    flex: 2; font-size: 16px; padding: 10px; border: 1.5px solid var(--line); border-radius: 8px;
+    min-width: 0; background: var(--field); color: var(--ink);
+  }
+  .bagRow input[type=number] {
+    flex: 1; font-size: 16px; padding: 10px; text-align: center;
+    border: 1.5px solid var(--line); border-radius: 8px; min-width: 0;
+    background: var(--field); color: var(--ink);
+  }
+  .bagRow .del { border: none; background: none; color: #e06c5a; font-size: 20px; padding: 6px; flex: 0; }
+  .bagBtns { display: flex; gap: 8px; margin-top: 10px; }
+  .bagBtns button {
+    flex: 1; font-size: 14px; font-weight: 600; padding: 11px;
+    border: 1.5px solid var(--line); border-radius: 10px;
+    background: var(--field); color: var(--ink);
+  }
+  .footnote { font-size: 12px; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+
+  .shotRow {
+    display: flex; justify-content: space-between; padding: 9px 2px;
+    border-bottom: 1px solid var(--line); font-size: 16px;
+  }
+  .shotRow b { font-variant-numeric: tabular-nums; }
+  #avgLine { font-size: 13px; color: var(--muted); margin-top: 10px; line-height: 1.6; }
+
+  #pickerClubs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  #pickerClubs button {
+    font-size: 15px; font-weight: 700; padding: 13px 4px;
+    border: 1.5px solid var(--line); border-radius: 10px;
+    background: var(--field); color: var(--ink);
+  }
+  #pickerSkip {
+    width: 100%; margin-top: 10px; font-size: 14px; padding: 11px;
+    border: none; background: none; color: var(--muted); text-decoration: underline;
+  }
+</style>
+</head>
+<body>
+
+<div id="mapWrap">
+  <div id="map"></div>
+
+  <div class="hudPanel" id="fcbPanel" style="display:none">
+    <div class="bf"><span id="fcbB">—</span><span class="lbl">b</span></div>
+    <div class="c" id="fcbC">—</div>
+    <div class="bf"><span id="fcbF">—</span><span class="lbl">f</span></div>
+  </div>
+
+  <button id="gpsBtn">📡 GPS</button>
+
+  <div id="sideCol">
+    <button class="hudBtn" id="loadCourseBtn" title="Load course">⛳</button>
+    <button class="hudBtn" id="settingsBtn" title="Wind, elevation, yardage">💨</button>
+    <button class="hudBtn" id="logBtn" title="Shot log">📊</button>
+    <button class="hudBtn" id="bagBtn" title="My bag">🎒</button>
+    <button class="hudBtn hidden" id="clearPinBtn" title="Clear target">✕</button>
+  </div>
+
+  <button id="markBtn" disabled title="Mark ball">📍</button>
+
+  <div id="clubPill" style="display:none">
+    <div class="club" id="pillClub">—</div>
+    <div class="opt" id="pillOpt">optimal</div>
+    <div class="alt hidden" id="pillAlt"></div>
+  </div>
+
+  <div id="chipRow">
+    <div class="mchip" id="elevChip">Flat<small>elev</small></div>
+    <div class="mchip" id="holeChip" style="display:none"><span class="lime" id="holeNum">1</span><small id="holePar">PAR 4</small></div>
+    <div class="mchip" id="windChip">Calm<small>wind</small></div>
+  </div>
+
+  <div id="hintToast" style="opacity:0">…</div>
+</div>
+
+<div id="backdrop" class="hidden"></div>
+
+<div class="sheet hidden" id="settingsSheet">
+  <div class="sheetHead"><h2>Conditions &amp; yardage</h2><button data-close>✕</button></div>
+  <label class="section">Wind</label>
+  <div class="seg" id="windDir">
+    <button data-v="down">⬇ Helping</button>
+    <button data-v="calm" class="on">Calm</button>
+    <button data-v="into">⬆ Into</button>
+  </div>
+  <div class="chips hidden" id="windStr">
+    <button data-v="5">5 mph</button>
+    <button data-v="10" class="on">10</button>
+    <button data-v="15">15</button>
+    <button data-v="20">20</button>
+  </div>
+  <label class="section">Elevation to target</label>
+  <div class="seg" id="elevDir">
+    <button data-v="down">⬇ Downhill</button>
+    <button data-v="flat" class="on">Flat</button>
+    <button data-v="up">⬆ Uphill</button>
+  </div>
+  <div class="chips hidden" id="elevStr">
+    <button data-v="5" class="on">5 yds</button>
+    <button data-v="10">10</button>
+    <button data-v="15">15</button>
+    <button data-v="20">20</button>
+  </div>
+  <label class="section">Manual yardage (no GPS)</label>
+  <input id="yardage" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="—" maxlength="3">
+  <div class="footnote">
+    Wind rule: into = +1% per mph, helping = −0.5% per mph. Elevation added 1:1.
+  </div>
+</div>
+
+<div class="sheet hidden" id="logSheet">
+  <div class="sheetHead"><h2>Shot log</h2><button data-close>✕</button></div>
+  <div id="shotList"></div>
+  <div id="avgLine"></div>
+  <div class="bagBtns">
+    <button id="clearShots">Clear all shots</button>
+  </div>
+  <div class="footnote">
+    Tap 📍 at your ball before you swing, then tap it again when you reach
+    the ball — the app measures the shot and asks what club you hit.
+  </div>
+</div>
+
+<div class="sheet hidden" id="bagSheet">
+  <div class="sheetHead"><h2>My bag</h2><button data-close>✕</button></div>
+  <div id="bagRows"></div>
+  <div class="bagBtns">
+    <button id="addClub">+ Add club</button>
+    <button id="resetBag">Reset to defaults</button>
+  </div>
+  <div class="footnote">
+    Carry distances in yards, saved on this phone.
+    Course outlines © OpenStreetMap contributors, via the Overpass API.
+    Imagery © Esri.
+  </div>
+</div>
+
+<div class="sheet hidden" id="picker">
+  <div class="sheetHead"><h2 id="pickerTitle">Shot: — yds. What did you hit?</h2></div>
+  <div id="pickerClubs"></div>
+  <button id="pickerSkip">Don't log this shot</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const DEFAULT_BAG = [
+  { name: "Driver",  carry: 230 },
+  { name: "3-wood",  carry: 215 },
+  { name: "Hybrid",  carry: 200 },
+  { name: "5-iron",  carry: 185 },
+  { name: "6-iron",  carry: 175 },
+  { name: "7-iron",  carry: 165 },
+  { name: "8-iron",  carry: 155 },
+  { name: "9-iron",  carry: 143 },
+  { name: "PW",      carry: 130 },
+  { name: "GW",      carry: 115 },
+  { name: "SW",      carry: 100 },
+  { name: "LW",      carry: 85  },
+];
+
+const STYLE = {
+  rough:   { stroke: false, fillColor: "#1d3b14", fillOpacity: 0.30, interactive: false },
+  fairway: { color: "#49e05e", weight: 2, opacity: 0.85, fillColor: "#49e05e", fillOpacity: 0.30, interactive: false },
+  tee:     { color: "#49e05e", weight: 1.5, opacity: 0.8, fillColor: "#49e05e", fillOpacity: 0.35, interactive: false },
+  bunker:  { color: "#cdd94e", weight: 1.5, opacity: 0.9, fillColor: "#cdd94e", fillOpacity: 0.7, interactive: false },
+  water:   { color: "#3fe3d0", weight: 1.5, opacity: 0.9, fillColor: "#2ec9c9", fillOpacity: 0.55, interactive: false },
+  green:   { color: "#b9f65c", weight: 2.5, opacity: 1, fillColor: "#5ff076", fillOpacity: 0.5 },
+  greenSel:{ color: "#ffffff", weight: 3 },
+  greenDef:{ color: "#b9f65c", weight: 2.5 }
+};
+
+const LAYUP_MARGIN = 5;    // yds past longest club = unreachable
+const LAYUP_LEAVE = 40;    // prefer landing spots leaving at least this much
+
+let bag = loadJSON("caddyBag", DEFAULT_BAG);
+let shots = loadJSON("caddyShots", []);
+let wind = { dir: "calm", mph: 10 };
+let elev = { dir: "flat", yds: 5 };
+let pos = null;
+let target = null;          // {lat,lng, green?}
+let pendingMark = null;
+let pendingShot = null;
+let course = null;
+let courseTried = false;
+
+function loadJSON(key, fallback) {
+  try {
+    const v = JSON.parse(localStorage.getItem(key));
+    if (v !== null && v !== undefined) return v;
+  } catch (e) {}
+  return fallback === null ? null : JSON.parse(JSON.stringify(fallback));
+}
+function save(key, v) { localStorage.setItem(key, JSON.stringify(v)); }
+
+// ---------- geometry ----------
+function distYds(a, b) {
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+  const s = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371000 * Math.asin(Math.sqrt(s)) * 1.09361;
+}
+function lerpPoint(a, b, f) {
+  return { lat: a.lat + (b.lat - a.lat) * f, lng: a.lng + (b.lng - a.lng) * f };
+}
+function centroid(pts) {
+  let lat = 0, lng = 0, n = 0;
+  for (let i = 0; i < pts.length; i++) {
+    if (i === pts.length - 1 && pts[i].lat === pts[0].lat && pts[i].lng === pts[0].lng) break;
+    lat += pts[i].lat; lng += pts[i].lng; n++;
+  }
+  return { lat: lat / n, lng: lng / n };
+}
+function holeForGreen(g) {
+  if (!course || !course.holes || !course.holes.length) return null;
+  const c = centroid(g.pts);
+  let best = null, bd = 80;
+  for (const h of course.holes) {
+    for (const e of [h.pts[0], h.pts[h.pts.length - 1]]) {
+      const d = distYds(c, e);
+      if (d < bd) { bd = d; best = h; }
+    }
+  }
+  return best;
+}
+
+// ---------- map ----------
+let map = null, youMarker = null, targetMarker = null;
+let shotLayer = null, courseLayer = null, aimLayer = null, greenPolys = [];
+
+if (typeof L !== "undefined") {
+  const last = loadJSON("caddyCenter", { lat: 39.8, lng: -98.5, z: 4 });
+  map = L.map("map", { zoomControl: false, attributionControl: false }).setView([last.lat, last.lng], last.z);
+  L.tileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    { maxZoom: 19 }
+  ).addTo(map);
+  courseLayer = L.layerGroup().addTo(map);
+  shotLayer = L.layerGroup().addTo(map);
+  aimLayer = L.layerGroup().addTo(map);
+
+  map.on("click", e => setTarget({ lat: e.latlng.lat, lng: e.latlng.lng }));
+  map.on("moveend", () => {
+    const c = map.getCenter();
+    save("caddyCenter", { lat: c.lat, lng: c.lng, z: map.getZoom() });
+  });
+
+  const cached = loadJSON("caddyCourse", null);
+  if (cached && cached.greens) { course = cached; drawCourse(); }
+  drawShots();
+}
+
+let hintTimer = null;
+function hint(msg, sticky) {
+  const t = document.getElementById("hintToast");
+  t.textContent = msg;
+  t.style.opacity = "1";
+  clearTimeout(hintTimer);
+  if (!sticky) hintTimer = setTimeout(() => { t.style.opacity = "0"; }, 5000);
+}
+setTimeout(() => hint("Pan to your course, tap ⛳ to load it, then tap a green."), 800);
+
+// ---------- course data (OpenStreetMap via Overpass) ----------
+async function loadCourse(lat, lng) {
+  hint("Loading course data…", true);
+  const q = `[out:json][timeout:25];
+(
+  way["golf"="green"](around:2500,${lat},${lng});
+  way["golf"="bunker"](around:2500,${lat},${lng});
+  way["golf"="fairway"](around:2500,${lat},${lng});
+  way["golf"="tee"](around:2500,${lat},${lng});
+  way["golf"="hole"](around:2500,${lat},${lng});
+  way["golf"="water_hazard"](around:2500,${lat},${lng});
+  way["natural"="water"](around:2500,${lat},${lng});
+  way["leisure"="golf_course"](around:2500,${lat},${lng});
+);
+out geom;`;
+  try {
+    const res = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      body: "data=" + encodeURIComponent(q)
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    course = { greens: [], bunkers: [], fairways: [], tees: [], water: [], holes: [], boundary: [] };
+    for (const el of data.elements) {
+      if (el.type !== "way" || !el.geometry || el.geometry.length < 2) continue;
+      const pts = el.geometry.map(g => ({ lat: g.lat, lng: g.lon }));
+      const tags = el.tags || {};
+      if (tags.golf === "hole") {
+        course.holes.push({ pts, ref: tags.ref || null, par: tags.par || null });
+        continue;
+      }
+      if (el.geometry.length < 3) continue;
+      const ref = tags.ref || tags.name || null;
+      if (tags.golf === "green")            course.greens.push({ pts, ref });
+      else if (tags.golf === "bunker")      course.bunkers.push({ pts });
+      else if (tags.golf === "fairway")     course.fairways.push({ pts });
+      else if (tags.golf === "tee")         course.tees.push({ pts });
+      else if (tags.golf === "water_hazard" || tags.natural === "water")
+                                            course.water.push({ pts });
+      else if (tags.leisure === "golf_course")
+                                            course.boundary.push({ pts });
+    }
+    save("caddyCourse", course);
+    drawCourse();
+    if (course.greens.length) {
+      hint("Loaded " + course.greens.length + " greens. Tap one for F/C/B.");
+    } else {
+      hint("No mapped golf data here — this course isn't in OpenStreetMap yet.");
+    }
+  } catch (err) {
+    hint("Course load failed (" + err.message + ") — try again in a minute.");
+  }
+}
+document.getElementById("loadCourseBtn").onclick = () => {
+  const c = map ? map.getCenter() : (pos || null);
+  if (c) loadCourse(c.lat, c.lng);
+};
+
+function drawCourse() {
+  if (!courseLayer || !course) return;
+  courseLayer.clearLayers();
+  greenPolys = [];
+  const draw = (arr, style) => {
+    for (const f of arr || [])
+      L.polygon(f.pts.map(p => [p.lat, p.lng]), style).addTo(courseLayer);
+  };
+  draw(course.boundary, STYLE.rough);
+  draw(course.fairways, STYLE.fairway);
+  draw(course.tees, STYLE.tee);
+  draw(course.water, STYLE.water);
+  draw(course.bunkers, STYLE.bunker);
+  for (const g of course.greens) {
+    const poly = L.polygon(g.pts.map(p => [p.lat, p.lng]), STYLE.green).addTo(courseLayer);
+    poly.on("click", e => {
+      L.DomEvent.stopPropagation(e);
+      selectGreen(g, poly);
+    });
+    const label = g.ref || (holeForGreen(g) || {}).ref;
+    if (label) {
+      L.marker(centroid(g.pts), {
+        interactive: false,
+        icon: L.divIcon({ className: "", html: "<div class='greenLabel'>" + label + "</div>", iconAnchor: [7, 7] })
+      }).addTo(courseLayer);
+    }
+    greenPolys.push({ g, poly });
+  }
+  if (target && target.green) {
+    const match = greenPolys.find(gp =>
+      gp.g.pts.length === target.green.pts.length &&
+      gp.g.pts[0].lat === target.green.pts[0].lat && gp.g.pts[0].lng === target.green.pts[0].lng);
+    if (match) match.poly.setStyle(STYLE.greenSel);
+  }
+}
+
+function selectGreen(g, poly) {
+  for (const gp of greenPolys) gp.poly.setStyle(STYLE.greenDef);
+  if (poly) poly.setStyle(STYLE.greenSel);
+  const c = centroid(g.pts);
+  setTarget({ lat: c.lat, lng: c.lng, green: g });
+}
+
+// ---------- target ----------
+function setTarget(t) {
+  target = t;
+  if (!t.green) for (const gp of greenPolys) gp.poly.setStyle(STYLE.greenDef);
+  if (map) {
+    if (targetMarker) { targetMarker.remove(); targetMarker = null; }
+    const icon = t.green
+      ? L.divIcon({ className: "", html: "<div class='flagBadge'>⛳</div>", iconSize: [0, 0] })
+      : L.divIcon({ className: "", html: "<div class='flagDot'></div>", iconAnchor: [7, 7] });
+    targetMarker = L.marker([t.lat, t.lng], { icon, interactive: false }).addTo(map);
+  }
+  document.getElementById("clearPinBtn").classList.remove("hidden");
+  recalc();
+}
+
+function clearTarget() {
+  target = null;
+  if (targetMarker) { targetMarker.remove(); targetMarker = null; }
+  if (aimLayer) aimLayer.clearLayers();
+  for (const gp of greenPolys) gp.poly.setStyle(STYLE.greenDef);
+  document.getElementById("clearPinBtn").classList.add("hidden");
+  recalc();
+}
+document.getElementById("clearPinBtn").onclick = clearTarget;
+
+// ---------- aim graphics (lines, chips, suggested target) ----------
+function chipMarker(pt, html) {
+  return L.marker([pt.lat, pt.lng], {
+    interactive: false,
+    icon: L.divIcon({ className: "", html, iconSize: [0, 0] })
+  });
+}
+function drawAim(layup) {
+  if (!aimLayer) return;
+  aimLayer.clearLayers();
+  if (!pos || !target) return;
+  if (layup) {
+    // you -> suggested landing (solid), landing -> green (dashed)
+    L.polyline([[pos.lat, pos.lng], [layup.pt.lat, layup.pt.lng]],
+      { color: "#ffffff", weight: 2.5, opacity: 0.95 }).addTo(aimLayer);
+    L.polyline([[layup.pt.lat, layup.pt.lng], [target.lat, target.lng]],
+      { color: "#ffffff", weight: 2, opacity: 0.7, dashArray: "6 7" }).addTo(aimLayer);
+    chipMarker(lerpPoint(pos, layup.pt, 0.5),
+      "<div class='distChip'>" + Math.round(layup.carry) + "</div>").addTo(aimLayer);
+    chipMarker(lerpPoint(layup.pt, target, 0.5),
+      "<div class='distChip'>" + Math.round(layup.leaves) + "</div>").addTo(aimLayer);
+    chipMarker(layup.pt,
+      "<div class='suggestChip'><span class='ring'></span><span class='txt'><b>" +
+      layup.club + "</b><small>optimal</small></span></div>").addTo(aimLayer);
+  } else {
+    L.polyline([[pos.lat, pos.lng], [target.lat, target.lng]],
+      { color: "#ffffff", weight: 2.5, opacity: 0.95 }).addTo(aimLayer);
+    chipMarker(lerpPoint(pos, target, 0.5),
+      "<div class='distChip'>" + Math.round(distYds(pos, target)) + "</div>").addTo(aimLayer);
+  }
+}
+
+function drawShots() {
+  if (!shotLayer) return;
+  shotLayer.clearLayers();
+  for (const s of shots) {
+    if (!s.from || !s.to) continue;
+    L.polyline([[s.from.lat, s.from.lng], [s.to.lat, s.to.lng]],
+      { color: "#ffd400", weight: 3, opacity: 0.85 }).addTo(shotLayer);
+    L.marker([s.to.lat, s.to.lng], {
+      icon: L.divIcon({ className: "", html: "<div class='ballDot'></div>", iconAnchor: [5, 5] })
+    }).bindPopup(s.club + " — " + Math.round(s.dist) + " yds").addTo(shotLayer);
+  }
+}
+
+// ---------- GPS ----------
+let watchId = null;
+const gpsBtn = document.getElementById("gpsBtn");
+
+gpsBtn.onclick = () => {
+  if (watchId !== null) return;
+  if (!navigator.geolocation) { gpsBtn.textContent = "No GPS"; return; }
+  gpsBtn.textContent = "📡 …";
+  watchId = navigator.geolocation.watchPosition(p => {
+    const first = !pos;
+    pos = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy };
+    gpsBtn.textContent = "📡 ±" + Math.round(pos.acc) + "m";
+    gpsBtn.classList.add("on");
+    document.getElementById("markBtn").disabled = false;
+    if (map) {
+      if (!youMarker) {
+        youMarker = L.marker([pos.lat, pos.lng], {
+          icon: L.divIcon({ className: "", html: "<div class='youDot'></div>", iconAnchor: [8, 8] })
+        }).addTo(map);
+      } else youMarker.setLatLng([pos.lat, pos.lng]);
+      if (first) map.setView([pos.lat, pos.lng], 17);
+    }
+    if (first && !courseTried && (!course || !course.greens.length)) {
+      courseTried = true;
+      loadCourse(pos.lat, pos.lng);
+    }
+    recalc();
+  }, err => {
+    gpsBtn.textContent = "📡 blocked";
+    gpsBtn.classList.remove("on");
+    watchId = null;
+  }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
+};
+
+// ---------- shot marking ----------
+document.getElementById("markBtn").onclick = () => {
+  if (!pos) return;
+  const here = { lat: pos.lat, lng: pos.lng };
+  if (pendingMark) {
+    const d = distYds(pendingMark, here);
+    if (d >= 15) {
+      pendingShot = { from: pendingMark, to: here, dist: d };
+      openPicker(d);
+    }
+  }
+  pendingMark = here;
+  const btn = document.getElementById("markBtn");
+  btn.classList.add("flash");
+  hint("Ball marked — hit away!");
+  setTimeout(() => btn.classList.remove("flash"), 1200);
+};
+
+function openPicker(d) {
+  document.getElementById("pickerTitle").textContent =
+    "Shot: " + Math.round(d) + " yds. What did you hit?";
+  const box = document.getElementById("pickerClubs");
+  box.innerHTML = "";
+  for (const c of bag) {
+    const b = document.createElement("button");
+    b.textContent = c.name;
+    b.onclick = () => {
+      shots.push({ club: c.name, dist: pendingShot.dist, from: pendingShot.from, to: pendingShot.to, t: Date.now() });
+      save("caddyShots", shots);
+      pendingShot = null;
+      closeSheets();
+      drawShots();
+      renderShots();
+    };
+    box.appendChild(b);
+  }
+  openSheet("picker");
+}
+document.getElementById("pickerSkip").onclick = () => { pendingShot = null; closeSheets(); };
+
+function renderShots() {
+  const list = document.getElementById("shotList");
+  list.innerHTML = "";
+  const recent = [...shots].reverse().slice(0, 30);
+  if (!recent.length) list.innerHTML = "<div class='footnote'>No shots logged yet.</div>";
+  for (const s of recent) {
+    const row = document.createElement("div");
+    row.className = "shotRow";
+    row.innerHTML = "<span>" + s.club + "</span><b>" + Math.round(s.dist) + " yds</b>";
+    list.appendChild(row);
+  }
+  const byClub = {};
+  for (const s of shots) (byClub[s.club] = byClub[s.club] || []).push(s.dist);
+  const parts = Object.entries(byClub).map(([c, ds]) =>
+    c + " avg " + Math.round(ds.reduce((a, b) => a + b, 0) / ds.length) + " (" + ds.length + ")");
+  document.getElementById("avgLine").textContent = parts.length ? "Averages: " + parts.join(" · ") : "";
+}
+document.getElementById("clearShots").onclick = () => {
+  if (!confirm("Delete all logged shots?")) return;
+  shots = [];
+  save("caddyShots", shots);
+  drawShots();
+  renderShots();
+};
+
+// ---------- sheets ----------
+const SHEETS = ["settingsSheet", "logSheet", "bagSheet", "picker"];
+function openSheet(id) {
+  closeSheets();
+  document.getElementById("backdrop").classList.remove("hidden");
+  document.getElementById(id).classList.remove("hidden");
+}
+function closeSheets() {
+  document.getElementById("backdrop").classList.add("hidden");
+  for (const s of SHEETS) document.getElementById(s).classList.add("hidden");
+}
+document.getElementById("backdrop").onclick = () => {
+  if (pendingShot) pendingShot = null;   // dismissing picker skips logging
+  closeSheets();
+};
+document.querySelectorAll("[data-close]").forEach(b => b.onclick = closeSheets);
+document.getElementById("settingsBtn").onclick = () => openSheet("settingsSheet");
+document.getElementById("logBtn").onclick = () => { renderShots(); openSheet("logSheet"); };
+document.getElementById("bagBtn").onclick = () => openSheet("bagSheet");
+document.getElementById("windChip").onclick = () => openSheet("settingsSheet");
+document.getElementById("elevChip").onclick = () => openSheet("settingsSheet");
+
+// ---------- segmented controls ----------
+function wireSeg(segId, chipsId, onChange) {
+  const seg = document.getElementById(segId);
+  const chips = document.getElementById(chipsId);
+  seg.querySelectorAll("button").forEach(b => b.onclick = () => {
+    seg.querySelectorAll("button").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    const neutral = (b.dataset.v === "calm" || b.dataset.v === "flat");
+    chips.classList.toggle("hidden", neutral);
+    onChange(b.dataset.v, Number(chips.querySelector(".on").dataset.v));
+    recalc();
+  });
+  chips.querySelectorAll("button").forEach(b => b.onclick = () => {
+    chips.querySelectorAll("button").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    onChange(seg.querySelector(".on").dataset.v, Number(b.dataset.v));
+    recalc();
+  });
+}
+wireSeg("windDir", "windStr", (dir, val) => { wind = { dir, mph: val }; });
+wireSeg("elevDir", "elevStr", (dir, val) => { elev = { dir, yds: val }; });
+document.getElementById("yardage").addEventListener("input", recalc);
+
+// ---------- recommendation ----------
+function effectiveYardage(raw) {
+  let e = raw;
+  if (wind.dir === "into") e = e * (1 + 0.01 * wind.mph);
+  if (wind.dir === "down") e = e * (1 - 0.005 * wind.mph);
+  if (elev.dir === "up")   e += elev.yds;
+  if (elev.dir === "down") e -= elev.yds;
+  return Math.round(e);
+}
+
+function sortedClubs() { return [...bag].sort((a, b) => b.carry - a.carry); }
+
+function recommend(e) {
+  const clubs = sortedClubs();
+  const longest = clubs[0], shortest = clubs[clubs.length - 1];
+
+  if (e > longest.carry + LAYUP_MARGIN)
+    return { club: longest.name, note: "Max out — that's all you've got", alt: "" };
+  if (e < shortest.carry - 15)
+    return { club: shortest.name, note: "Partial swing — " + e + " yds", alt: "" };
+
+  let over = null, under = null;
+  for (const c of clubs) {
+    if (c.carry >= e) over = c;
+    else { under = c; break; }
+  }
+  if (!over) over = longest;
+  const overDiff = over.carry - e;
+
+  if (overDiff <= 4)
+    return { club: over.name, note: "Full swing (" + over.carry + " carry)",
+             alt: under ? "Too much? " + under.name + " carries " + under.carry : "" };
+  if (under && (e - under.carry) <= 4)
+    return { club: under.name, note: "Smooth full swing (" + under.carry + " carry)",
+             alt: over.name + " easy carries " + over.carry };
+  return { club: over.name, note: "Swing easy — full carries " + over.carry,
+           alt: under ? "Or step on a " + under.name + " (" + under.carry + ")" : "" };
+}
+
+// pick the longest club that still leaves a comfortable next shot
+function planLayup(rawDist) {
+  const clubs = sortedClubs();
+  let choice = clubs[0];
+  for (const c of clubs) {
+    if (rawDist - c.carry >= LAYUP_LEAVE) { choice = c; break; }
+  }
+  const carry = Math.min(choice.carry, rawDist - 10);
+  return {
+    club: choice.name,
+    carry,
+    leaves: rawDist - carry,
+    pt: lerpPoint(pos, target, carry / rawDist)
+  };
+}
+
+// ---------- HUD ----------
+function updateHud(raw, f, b, pill) {
+  const fcb = document.getElementById("fcbPanel");
+  if (raw !== null && f !== null) {
+    document.getElementById("fcbB").textContent = Math.round(b);
+    document.getElementById("fcbC").textContent = raw;
+    document.getElementById("fcbF").textContent = Math.round(f);
+    fcb.style.display = "block";
+  } else fcb.style.display = "none";
+
+  const pillEl = document.getElementById("clubPill");
+  if (pill) {
+    document.getElementById("pillClub").textContent = pill.club;
+    document.getElementById("pillOpt").textContent = pill.sub;
+    const altEl = document.getElementById("pillAlt");
+    if (pill.alt) { altEl.textContent = pill.alt; altEl.classList.remove("hidden"); }
+    else altEl.classList.add("hidden");
+    pillEl.style.display = "block";
+  } else pillEl.style.display = "none";
+
+  const wc = document.getElementById("windChip");
+  wc.innerHTML = (wind.dir === "calm")
+    ? "Calm<small>wind</small>"
+    : (wind.dir === "into" ? "⬆ " : "⬇ ") + wind.mph + "<small>mph " + (wind.dir === "into" ? "into" : "helping") + "</small>";
+  const ec = document.getElementById("elevChip");
+  ec.innerHTML = (elev.dir === "flat")
+    ? "Flat<small>elev</small>"
+    : (elev.dir === "up" ? "⬆ " : "⬇ ") + elev.yds + "<small>yds " + (elev.dir === "up" ? "uphill" : "downhill") + "</small>";
+
+  const hc = document.getElementById("holeChip");
+  const hole = (target && target.green) ? holeForGreen(target.green) : null;
+  if (hole && (hole.ref || hole.par)) {
+    document.getElementById("holeNum").textContent = hole.ref || "•";
+    document.getElementById("holePar").textContent = hole.par ? "PAR " + hole.par : "";
+    hc.style.display = "block";
+  } else hc.style.display = "none";
+}
+
+function recalc() {
+  let raw = null, front = null, back = null, pill = null, layup = null;
+
+  if (pos && target) {
+    raw = Math.round(distYds(pos, target));
+    if (target.green) {
+      let f = Infinity, b = 0;
+      for (const p of target.green.pts) {
+        const d = distYds(pos, p);
+        if (d < f) f = d;
+        if (d > b) b = d;
+      }
+      front = f; back = b;
+      const e = effectiveYardage(raw);
+      const clubs = sortedClubs();
+      if (e > clubs[0].carry + LAYUP_MARGIN && raw > clubs[0].carry) {
+        // can't reach: suggest optimal landing spot like Tangent
+        layup = planLayup(raw);
+        const next = recommend(Math.round(layup.leaves));
+        pill = { club: layup.club, sub: "optimal",
+                 alt: "leaves " + Math.round(layup.leaves) + " yds (" + next.club + ")" };
+      } else {
+        const r = recommend(e);
+        pill = { club: r.club, sub: r.note, alt: r.alt || (e !== raw ? "plays as " + e : "") };
+        if (e !== raw && r.alt) pill.alt = "plays as " + e + " — " + r.alt;
+      }
+    } else {
+      const e = effectiveYardage(raw);
+      const r = recommend(e);
+      pill = { club: r.club, sub: r.note, alt: (e !== raw ? "plays as " + e + (r.alt ? " — " + r.alt : "") : r.alt) };
+    }
+  } else {
+    const manual = parseInt(document.getElementById("yardage").value, 10);
+    if (manual && manual >= 10) {
+      raw = manual;
+      const e = effectiveYardage(raw);
+      const r = recommend(e);
+      pill = { club: r.club, sub: r.note, alt: (e !== raw ? "plays as " + e + (r.alt ? " — " + r.alt : "") : r.alt) };
+    }
+  }
+
+  drawAim(layup);
+  updateHud(raw, front, back, pill);
+}
+
+// ---------- bag editor ----------
+function renderBag() {
+  const box = document.getElementById("bagRows");
+  box.innerHTML = "";
+  bag.forEach((c, i) => {
+    const row = document.createElement("div");
+    row.className = "bagRow";
+    const name = document.createElement("input");
+    name.type = "text"; name.value = c.name;
+    name.oninput = () => { bag[i].name = name.value; save("caddyBag", bag); recalc(); };
+    const carry = document.createElement("input");
+    carry.type = "number"; carry.inputMode = "numeric"; carry.value = c.carry;
+    carry.oninput = () => { bag[i].carry = Number(carry.value) || 0; save("caddyBag", bag); recalc(); };
+    const del = document.createElement("button");
+    del.className = "del"; del.textContent = "✕";
+    del.onclick = () => { bag.splice(i, 1); save("caddyBag", bag); renderBag(); recalc(); };
+    row.append(name, carry, del);
+    box.appendChild(row);
+  });
+}
+document.getElementById("addClub").onclick = () => {
+  bag.push({ name: "New club", carry: 100 });
+  save("caddyBag", bag); renderBag();
+};
+document.getElementById("resetBag").onclick = () => {
+  bag = JSON.parse(JSON.stringify(DEFAULT_BAG));
+  save("caddyBag", bag); renderBag(); recalc();
+};
+
+renderBag();
+renderShots();
+recalc();
+</script>
+</body>
+</html>
