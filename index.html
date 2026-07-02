@@ -33,7 +33,6 @@
   .leaflet-container { background: #0b0e08; }
 
   /* ---------- HUD ---------- */
-  .hudPanel { position: absolute; z-index: 900; pointer-events: none; }
   .hudBtn {
     width: 48px; height: 48px;
     border-radius: 14px;
@@ -46,6 +45,7 @@
   }
 
   #fcbPanel {
+    position: absolute; z-index: 900; pointer-events: none;
     top: calc(10px + var(--safe-top)); left: 10px;
     background: var(--hud);
     border: 1.5px solid var(--lime-dim);
@@ -95,7 +95,7 @@
     padding: 7px 24px;
     text-align: center;
     white-space: nowrap;
-    max-width: 70vw;
+    max-width: 66vw;
   }
   #clubPill .club { font-size: 27px; font-weight: 800; color: var(--lime); line-height: 1.05; }
   #clubPill .opt  { font-size: 13px; font-weight: 600; color: #e8ecdc; }
@@ -104,20 +104,22 @@
   #chipRow {
     position: absolute; z-index: 900;
     bottom: calc(10px + var(--safe-bottom)); left: 10px; right: 10px;
-    display: flex; gap: 8px; justify-content: space-between;
+    display: flex; gap: 6px; justify-content: center; align-items: stretch;
   }
   .mchip {
     background: var(--hud);
     border: 1.5px solid var(--lime-dim);
     border-radius: 14px;
-    padding: 5px 13px;
+    padding: 5px 12px;
     color: #fff; font-weight: 800; font-size: 16px;
     text-align: center; line-height: 1.15;
     font-variant-numeric: tabular-nums;
     cursor: pointer;
+    display: flex; flex-direction: column; justify-content: center;
   }
   .mchip small { display: block; font-weight: 600; font-size: 11px; color: #c9d4a3; }
   .mchip .lime { color: var(--lime); }
+  .arrowChip { font-size: 18px; padding: 5px 14px; }
 
   #hintToast {
     position: absolute; z-index: 960; pointer-events: none;
@@ -127,7 +129,7 @@
     border-radius: 12px;
     padding: 8px 14px;
     font-size: 13px; font-weight: 600; color: #fff;
-    max-width: 60vw; text-align: center;
+    max-width: 58vw; text-align: center;
     transition: opacity 0.4s;
   }
 
@@ -135,6 +137,11 @@
   .youDot {
     width: 16px; height: 16px; border-radius: 50%;
     background: #4c9aff; border: 3px solid #fff;
+    box-shadow: 0 0 8px rgba(0,0,0,0.6);
+  }
+  .teeDot {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: transparent; border: 3.5px solid #fff;
     box-shadow: 0 0 8px rgba(0,0,0,0.6);
   }
   .flagDot {
@@ -249,6 +256,34 @@
   }
   #yardage:focus { outline: none; border-color: var(--lime); }
 
+  .searchRow { display: flex; gap: 8px; }
+  .searchRow input {
+    flex: 1; font-size: 16px; padding: 11px; min-width: 0;
+    border: 1.5px solid var(--line); border-radius: 10px;
+    background: var(--field); color: var(--ink);
+  }
+  .searchRow input:focus { outline: none; border-color: var(--lime); }
+  .searchRow button {
+    font-size: 17px; padding: 11px 16px;
+    border: 1.5px solid var(--lime-dim); border-radius: 10px;
+    background: var(--field); color: var(--ink);
+  }
+  .resultRow {
+    padding: 11px 6px; font-size: 14px; line-height: 1.35;
+    border-bottom: 1px solid var(--line); cursor: pointer;
+  }
+  .resultRow b { color: var(--lime); display: block; font-size: 15px; }
+  .resultRow span { color: var(--muted); font-size: 12px; }
+
+  #holesGrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; }
+  #holesGrid button {
+    padding: 9px 2px; border: 1.5px solid var(--line); border-radius: 10px;
+    background: var(--field); color: var(--ink);
+    font-size: 16px; font-weight: 800; line-height: 1.1;
+  }
+  #holesGrid button small { display: block; font-size: 10px; font-weight: 600; color: var(--muted); }
+  #holesGrid button.on { border-color: var(--lime); color: var(--lime); }
+
   .bagRow { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
   .bagRow input[type=text] {
     flex: 2; font-size: 16px; padding: 10px; border: 1.5px solid var(--line); border-radius: 8px;
@@ -292,7 +327,7 @@
 <div id="mapWrap">
   <div id="map"></div>
 
-  <div class="hudPanel" id="fcbPanel" style="display:none">
+  <div id="fcbPanel" style="display:none">
     <div class="bf"><span id="fcbB">—</span><span class="lbl">b</span></div>
     <div class="c" id="fcbC">—</div>
     <div class="bf"><span id="fcbF">—</span><span class="lbl">f</span></div>
@@ -301,7 +336,7 @@
   <button id="gpsBtn">📡 GPS</button>
 
   <div id="sideCol">
-    <button class="hudBtn" id="loadCourseBtn" title="Load course">⛳</button>
+    <button class="hudBtn" id="courseBtn" title="Course &amp; holes">⛳</button>
     <button class="hudBtn" id="settingsBtn" title="Wind, elevation, yardage">💨</button>
     <button class="hudBtn" id="logBtn" title="Shot log">📊</button>
     <button class="hudBtn" id="bagBtn" title="My bag">🎒</button>
@@ -318,7 +353,9 @@
 
   <div id="chipRow">
     <div class="mchip" id="elevChip">Flat<small>elev</small></div>
+    <div class="mchip arrowChip hidden" id="prevHole">◀</div>
     <div class="mchip" id="holeChip" style="display:none"><span class="lime" id="holeNum">1</span><small id="holePar">PAR 4</small></div>
+    <div class="mchip arrowChip hidden" id="nextHole">▶</div>
     <div class="mchip" id="windChip">Calm<small>wind</small></div>
   </div>
 
@@ -326,6 +363,20 @@
 </div>
 
 <div id="backdrop" class="hidden"></div>
+
+<div class="sheet hidden" id="courseSheet">
+  <div class="sheetHead"><h2>Course &amp; holes</h2><button data-close>✕</button></div>
+  <div class="searchRow">
+    <input id="courseSearch" type="text" placeholder="Search course name…" enterkeyhint="search">
+    <button id="searchBtn">🔍</button>
+  </div>
+  <div id="searchResults"></div>
+  <div class="bagBtns">
+    <button id="loadHereBtn">⛳ Load course at map center</button>
+  </div>
+  <label class="section" id="holesLabel" style="display:none">Start on hole — tap a tee box on the map to play from it</label>
+  <div id="holesGrid"></div>
+</div>
 
 <div class="sheet hidden" id="settingsSheet">
   <div class="sheetHead"><h2>Conditions &amp; yardage</h2><button data-close>✕</button></div>
@@ -383,7 +434,7 @@
   <div class="footnote">
     Carry distances in yards, saved on this phone.
     Course outlines © OpenStreetMap contributors, via the Overpass API.
-    Imagery © Esri.
+    Search © Nominatim/OSM. Imagery © Esri.
   </div>
 </div>
 
@@ -413,7 +464,7 @@ const DEFAULT_BAG = [
 const STYLE = {
   rough:   { stroke: false, fillColor: "#1d3b14", fillOpacity: 0.30, interactive: false },
   fairway: { color: "#49e05e", weight: 2, opacity: 0.85, fillColor: "#49e05e", fillOpacity: 0.30, interactive: false },
-  tee:     { color: "#49e05e", weight: 1.5, opacity: 0.8, fillColor: "#49e05e", fillOpacity: 0.35, interactive: false },
+  tee:     { color: "#ffffff", weight: 1.5, opacity: 0.85, fillColor: "#49e05e", fillOpacity: 0.4 },
   bunker:  { color: "#cdd94e", weight: 1.5, opacity: 0.9, fillColor: "#cdd94e", fillOpacity: 0.7, interactive: false },
   water:   { color: "#3fe3d0", weight: 1.5, opacity: 0.9, fillColor: "#2ec9c9", fillOpacity: 0.55, interactive: false },
   green:   { color: "#b9f65c", weight: 2.5, opacity: 1, fillColor: "#5ff076", fillOpacity: 0.5 },
@@ -421,19 +472,22 @@ const STYLE = {
   greenDef:{ color: "#b9f65c", weight: 2.5 }
 };
 
-const LAYUP_MARGIN = 5;    // yds past longest club = unreachable
-const LAYUP_LEAVE = 40;    // prefer landing spots leaving at least this much
+const LAYUP_MARGIN = 5;
+const LAYUP_LEAVE = 40;
 
 let bag = loadJSON("caddyBag", DEFAULT_BAG);
 let shots = loadJSON("caddyShots", []);
 let wind = { dir: "calm", mph: 10 };
 let elev = { dir: "flat", yds: 5 };
-let pos = null;
+let pos = null;             // live GPS fix
+let teePos = null;          // virtual position from selected tee (used when no GPS)
 let target = null;          // {lat,lng, green?}
 let pendingMark = null;
 let pendingShot = null;
 let course = null;
 let courseTried = false;
+let holesSorted = [];       // holes with refs, sorted
+let currentHole = null;     // index into holesSorted
 
 function loadJSON(key, fallback) {
   try {
@@ -443,6 +497,7 @@ function loadJSON(key, fallback) {
   return fallback === null ? null : JSON.parse(JSON.stringify(fallback));
 }
 function save(key, v) { localStorage.setItem(key, JSON.stringify(v)); }
+function effPos() { return pos || teePos; }
 
 // ---------- geometry ----------
 function distYds(a, b) {
@@ -475,9 +530,17 @@ function holeForGreen(g) {
   }
   return best;
 }
+function nearestGreen(pt) {
+  let best = { green: null, poly: null, d: Infinity };
+  for (const gp of greenPolys) {
+    const d = distYds(pt, centroid(gp.g.pts));
+    if (d < best.d) best = { green: gp.g, poly: gp.poly, d };
+  }
+  return best;
+}
 
 // ---------- map ----------
-let map = null, youMarker = null, targetMarker = null;
+let map = null, youMarker = null, teeMarker = null, targetMarker = null;
 let shotLayer = null, courseLayer = null, aimLayer = null, greenPolys = [];
 
 if (typeof L !== "undefined") {
@@ -498,7 +561,7 @@ if (typeof L !== "undefined") {
   });
 
   const cached = loadJSON("caddyCourse", null);
-  if (cached && cached.greens) { course = cached; drawCourse(); }
+  if (cached && cached.greens) { course = cached; drawCourse(); indexHoles(); }
   drawShots();
 }
 
@@ -510,7 +573,57 @@ function hint(msg, sticky) {
   clearTimeout(hintTimer);
   if (!sticky) hintTimer = setTimeout(() => { t.style.opacity = "0"; }, 5000);
 }
-setTimeout(() => hint("Pan to your course, tap ⛳ to load it, then tap a green."), 800);
+setTimeout(() => hint("Tap ⛳ to find your course."), 800);
+
+// ---------- course search (Nominatim) ----------
+async function searchCourse(q) {
+  const box = document.getElementById("searchResults");
+  box.innerHTML = "<div class='footnote'>Searching…</div>";
+  try {
+    let res = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=6&q=" +
+      encodeURIComponent(q));
+    let data = await res.json();
+    if (!data.length && !/golf/i.test(q)) {
+      res = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=6&q=" +
+        encodeURIComponent(q + " golf course"));
+      data = await res.json();
+    }
+    box.innerHTML = "";
+    if (!data.length) {
+      box.innerHTML = "<div class='footnote'>No results — try adding the city or state.</div>";
+      return;
+    }
+    for (const r of data) {
+      const row = document.createElement("div");
+      row.className = "resultRow";
+      const parts = r.display_name.split(", ");
+      row.innerHTML = "<b>" + parts[0] + "</b><span>" + parts.slice(1, 4).join(", ") + "</span>";
+      row.onclick = () => {
+        closeSheets();
+        map.setView([Number(r.lat), Number(r.lon)], 16);
+        loadCourse(Number(r.lat), Number(r.lon));
+      };
+      box.appendChild(row);
+    }
+  } catch (err) {
+    box.innerHTML = "<div class='footnote'>Search failed (" + err.message + ") — try again.</div>";
+  }
+}
+document.getElementById("searchBtn").onclick = () => {
+  const q = document.getElementById("courseSearch").value.trim();
+  if (q) searchCourse(q);
+};
+document.getElementById("courseSearch").addEventListener("keydown", e => {
+  if (e.key === "Enter") {
+    const q = e.target.value.trim();
+    if (q) searchCourse(q);
+  }
+});
+document.getElementById("loadHereBtn").onclick = () => {
+  closeSheets();
+  const c = map.getCenter();
+  loadCourse(c.lat, c.lng);
+};
 
 // ---------- course data (OpenStreetMap via Overpass) ----------
 async function loadCourse(lat, lng) {
@@ -548,16 +661,20 @@ out geom;`;
       if (tags.golf === "green")            course.greens.push({ pts, ref });
       else if (tags.golf === "bunker")      course.bunkers.push({ pts });
       else if (tags.golf === "fairway")     course.fairways.push({ pts });
-      else if (tags.golf === "tee")         course.tees.push({ pts });
+      else if (tags.golf === "tee")         course.tees.push({ pts, ref });
       else if (tags.golf === "water_hazard" || tags.natural === "water")
                                             course.water.push({ pts });
       else if (tags.leisure === "golf_course")
                                             course.boundary.push({ pts });
     }
     save("caddyCourse", course);
+    currentHole = null;
     drawCourse();
+    indexHoles();
     if (course.greens.length) {
-      hint("Loaded " + course.greens.length + " greens. Tap one for F/C/B.");
+      hint("Loaded " + course.greens.length + " greens" +
+           (holesSorted.length ? " · " + holesSorted.length + " holes" : "") + ".");
+      if (holesSorted.length) { renderHolesGrid(); openSheet("courseSheet"); }
     } else {
       hint("No mapped golf data here — this course isn't in OpenStreetMap yet.");
     }
@@ -565,10 +682,62 @@ out geom;`;
     hint("Course load failed (" + err.message + ") — try again in a minute.");
   }
 }
-document.getElementById("loadCourseBtn").onclick = () => {
-  const c = map ? map.getCenter() : (pos || null);
-  if (c) loadCourse(c.lat, c.lng);
-};
+
+function indexHoles() {
+  holesSorted = (course && course.holes ? [...course.holes] : [])
+    .filter(h => h.ref !== null && !isNaN(parseInt(h.ref)))
+    .sort((a, b) => parseInt(a.ref) - parseInt(b.ref));
+  const show = holesSorted.length > 0;
+  document.getElementById("prevHole").classList.toggle("hidden", !show);
+  document.getElementById("nextHole").classList.toggle("hidden", !show);
+  document.getElementById("holesLabel").style.display = show ? "block" : "none";
+  renderHolesGrid();
+}
+
+function renderHolesGrid() {
+  const grid = document.getElementById("holesGrid");
+  grid.innerHTML = "";
+  holesSorted.forEach((h, i) => {
+    const b = document.createElement("button");
+    b.innerHTML = h.ref + (h.par ? "<small>par " + h.par + "</small>" : "<small>&nbsp;</small>");
+    if (i === currentHole) b.classList.add("on");
+    b.onclick = () => { closeSheets(); selectHole(i); };
+    grid.appendChild(b);
+  });
+}
+
+function selectHole(i) {
+  if (!holesSorted.length) return;
+  currentHole = ((i % holesSorted.length) + holesSorted.length) % holesSorted.length;
+  const h = holesSorted[currentHole];
+  const a = h.pts[0], b = h.pts[h.pts.length - 1];
+  // hole ways run tee -> green; confirm by checking which end is nearer a green
+  const ga = nearestGreen(a), gb = nearestGreen(b);
+  let teeEnd = a, g = gb;
+  if (ga.d < gb.d) { teeEnd = b; g = ga; }
+  if (g.green && g.d < 120) selectGreen(g.green, g.poly);
+  else setTarget(teeEnd === a ? { lat: b.lat, lng: b.lng } : { lat: a.lat, lng: a.lng });
+  if (!pos) setTeePos(teeEnd, "Hole " + h.ref + " — playing from the tee");
+  if (map) map.fitBounds(L.latLngBounds(h.pts.map(p => [p.lat, p.lng])).pad(0.35));
+  renderHolesGrid();
+  recalc();
+}
+document.getElementById("prevHole").onclick = () => selectHole((currentHole === null ? 0 : currentHole - 1));
+document.getElementById("nextHole").onclick = () => selectHole((currentHole === null ? 0 : currentHole + 1));
+
+function setTeePos(pt, msg) {
+  teePos = { lat: pt.lat, lng: pt.lng };
+  if (map) {
+    if (!teeMarker) {
+      teeMarker = L.marker([pt.lat, pt.lng], {
+        interactive: false,
+        icon: L.divIcon({ className: "", html: "<div class='teeDot'></div>", iconAnchor: [8, 8] })
+      }).addTo(map);
+    } else teeMarker.setLatLng([pt.lat, pt.lng]);
+  }
+  if (msg) hint(msg);
+  recalc();
+}
 
 function drawCourse() {
   if (!courseLayer || !course) return;
@@ -580,9 +749,17 @@ function drawCourse() {
   };
   draw(course.boundary, STYLE.rough);
   draw(course.fairways, STYLE.fairway);
-  draw(course.tees, STYLE.tee);
   draw(course.water, STYLE.water);
   draw(course.bunkers, STYLE.bunker);
+  // tees are tappable: play from the tee you choose
+  for (const t of course.tees || []) {
+    const poly = L.polygon(t.pts.map(p => [p.lat, p.lng]), STYLE.tee).addTo(courseLayer);
+    poly.on("click", e => {
+      L.DomEvent.stopPropagation(e);
+      if (pos) { hint("GPS is on — using your live position"); return; }
+      setTeePos(centroid(t.pts), "Playing from this tee" + (t.ref ? " (" + t.ref + ")" : ""));
+    });
+  }
   for (const g of course.greens) {
     const poly = L.polygon(g.pts.map(p => [p.lat, p.lng]), STYLE.green).addTo(courseLayer);
     poly.on("click", e => {
@@ -611,6 +788,12 @@ function selectGreen(g, poly) {
   if (poly) poly.setStyle(STYLE.greenSel);
   const c = centroid(g.pts);
   setTarget({ lat: c.lat, lng: c.lng, green: g });
+  // keep hole navigation in sync when a green is tapped directly
+  const h = holeForGreen(g);
+  if (h) {
+    const idx = holesSorted.indexOf(h);
+    if (idx >= 0) { currentHole = idx; renderHolesGrid(); }
+  }
 }
 
 // ---------- target ----------
@@ -638,7 +821,7 @@ function clearTarget() {
 }
 document.getElementById("clearPinBtn").onclick = clearTarget;
 
-// ---------- aim graphics (lines, chips, suggested target) ----------
+// ---------- aim graphics ----------
 function chipMarker(pt, html) {
   return L.marker([pt.lat, pt.lng], {
     interactive: false,
@@ -648,14 +831,14 @@ function chipMarker(pt, html) {
 function drawAim(layup) {
   if (!aimLayer) return;
   aimLayer.clearLayers();
-  if (!pos || !target) return;
+  const p = effPos();
+  if (!p || !target) return;
   if (layup) {
-    // you -> suggested landing (solid), landing -> green (dashed)
-    L.polyline([[pos.lat, pos.lng], [layup.pt.lat, layup.pt.lng]],
+    L.polyline([[p.lat, p.lng], [layup.pt.lat, layup.pt.lng]],
       { color: "#ffffff", weight: 2.5, opacity: 0.95 }).addTo(aimLayer);
     L.polyline([[layup.pt.lat, layup.pt.lng], [target.lat, target.lng]],
       { color: "#ffffff", weight: 2, opacity: 0.7, dashArray: "6 7" }).addTo(aimLayer);
-    chipMarker(lerpPoint(pos, layup.pt, 0.5),
+    chipMarker(lerpPoint(p, layup.pt, 0.5),
       "<div class='distChip'>" + Math.round(layup.carry) + "</div>").addTo(aimLayer);
     chipMarker(lerpPoint(layup.pt, target, 0.5),
       "<div class='distChip'>" + Math.round(layup.leaves) + "</div>").addTo(aimLayer);
@@ -663,10 +846,10 @@ function drawAim(layup) {
       "<div class='suggestChip'><span class='ring'></span><span class='txt'><b>" +
       layup.club + "</b><small>optimal</small></span></div>").addTo(aimLayer);
   } else {
-    L.polyline([[pos.lat, pos.lng], [target.lat, target.lng]],
+    L.polyline([[p.lat, p.lng], [target.lat, target.lng]],
       { color: "#ffffff", weight: 2.5, opacity: 0.95 }).addTo(aimLayer);
-    chipMarker(lerpPoint(pos, target, 0.5),
-      "<div class='distChip'>" + Math.round(distYds(pos, target)) + "</div>").addTo(aimLayer);
+    chipMarker(lerpPoint(p, target, 0.5),
+      "<div class='distChip'>" + Math.round(distYds(p, target)) + "</div>").addTo(aimLayer);
   }
 }
 
@@ -697,6 +880,7 @@ gpsBtn.onclick = () => {
     gpsBtn.textContent = "📡 ±" + Math.round(pos.acc) + "m";
     gpsBtn.classList.add("on");
     document.getElementById("markBtn").disabled = false;
+    if (teeMarker) { teeMarker.remove(); teeMarker = null; }
     if (map) {
       if (!youMarker) {
         youMarker = L.marker([pos.lat, pos.lng], {
@@ -783,7 +967,7 @@ document.getElementById("clearShots").onclick = () => {
 };
 
 // ---------- sheets ----------
-const SHEETS = ["settingsSheet", "logSheet", "bagSheet", "picker"];
+const SHEETS = ["courseSheet", "settingsSheet", "logSheet", "bagSheet", "picker"];
 function openSheet(id) {
   closeSheets();
   document.getElementById("backdrop").classList.remove("hidden");
@@ -794,15 +978,17 @@ function closeSheets() {
   for (const s of SHEETS) document.getElementById(s).classList.add("hidden");
 }
 document.getElementById("backdrop").onclick = () => {
-  if (pendingShot) pendingShot = null;   // dismissing picker skips logging
+  if (pendingShot) pendingShot = null;
   closeSheets();
 };
 document.querySelectorAll("[data-close]").forEach(b => b.onclick = closeSheets);
+document.getElementById("courseBtn").onclick = () => { renderHolesGrid(); openSheet("courseSheet"); };
 document.getElementById("settingsBtn").onclick = () => openSheet("settingsSheet");
 document.getElementById("logBtn").onclick = () => { renderShots(); openSheet("logSheet"); };
 document.getElementById("bagBtn").onclick = () => openSheet("bagSheet");
 document.getElementById("windChip").onclick = () => openSheet("settingsSheet");
 document.getElementById("elevChip").onclick = () => openSheet("settingsSheet");
+document.getElementById("holeChip").onclick = () => { renderHolesGrid(); openSheet("courseSheet"); };
 
 // ---------- segmented controls ----------
 function wireSeg(segId, chipsId, onChange) {
@@ -866,8 +1052,7 @@ function recommend(e) {
            alt: under ? "Or step on a " + under.name + " (" + under.carry + ")" : "" };
 }
 
-// pick the longest club that still leaves a comfortable next shot
-function planLayup(rawDist) {
+function planLayup(rawDist, p) {
   const clubs = sortedClubs();
   let choice = clubs[0];
   for (const c of clubs) {
@@ -878,7 +1063,7 @@ function planLayup(rawDist) {
     club: choice.name,
     carry,
     leaves: rawDist - carry,
-    pt: lerpPoint(pos, target, carry / rawDist)
+    pt: lerpPoint(p, target, carry / rawDist)
   };
 }
 
@@ -912,23 +1097,26 @@ function updateHud(raw, f, b, pill) {
     : (elev.dir === "up" ? "⬆ " : "⬇ ") + elev.yds + "<small>yds " + (elev.dir === "up" ? "uphill" : "downhill") + "</small>";
 
   const hc = document.getElementById("holeChip");
-  const hole = (target && target.green) ? holeForGreen(target.green) : null;
+  let hole = null;
+  if (currentHole !== null && holesSorted[currentHole]) hole = holesSorted[currentHole];
+  else if (target && target.green) hole = holeForGreen(target.green);
   if (hole && (hole.ref || hole.par)) {
     document.getElementById("holeNum").textContent = hole.ref || "•";
     document.getElementById("holePar").textContent = hole.par ? "PAR " + hole.par : "";
-    hc.style.display = "block";
+    hc.style.display = "flex";
   } else hc.style.display = "none";
 }
 
 function recalc() {
   let raw = null, front = null, back = null, pill = null, layup = null;
+  const p = effPos();
 
-  if (pos && target) {
-    raw = Math.round(distYds(pos, target));
+  if (p && target) {
+    raw = Math.round(distYds(p, target));
     if (target.green) {
       let f = Infinity, b = 0;
-      for (const p of target.green.pts) {
-        const d = distYds(pos, p);
+      for (const pt of target.green.pts) {
+        const d = distYds(p, pt);
         if (d < f) f = d;
         if (d > b) b = d;
       }
@@ -936,8 +1124,7 @@ function recalc() {
       const e = effectiveYardage(raw);
       const clubs = sortedClubs();
       if (e > clubs[0].carry + LAYUP_MARGIN && raw > clubs[0].carry) {
-        // can't reach: suggest optimal landing spot like Tangent
-        layup = planLayup(raw);
+        layup = planLayup(raw, p);
         const next = recommend(Math.round(layup.leaves));
         pill = { club: layup.club, sub: "optimal",
                  alt: "leaves " + Math.round(layup.leaves) + " yds (" + next.club + ")" };
