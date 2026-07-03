@@ -536,15 +536,21 @@ function nearestGreenTo(pt){
 
 /* ================= ROUND ================= */
 let EXPLORE=false;
-function startRound(explore){
+async function startRound(explore){
   EXPLORE=explore;
   const c=SETUP.course;
+  // make sure the SELECTED course's map is loaded before we build the round —
+  // never fall back to a stale/previous course
+  if(!COURSE||COURSE.name!==c.name||!COURSE.greens){
+    const note=document.getElementById("loadNote");if(note)note.textContent="Loading course map…";
+    await loadCourse(c);
+  }
   const hs=(COURSE&&COURSE.name===c.name&&COURSE.holesSorted.length)?COURSE.holesSorted:null;
   const n=hs?hs.length:(c.holes||18);
   if(!explore){
     S.active={course:c.name,city:c.city||"",date:today(),scoring:SETUP.scoring,net:SETUP.net,
       holes:Array.from({length:n},(_,i)=>({par:hs?(parseInt(hs[i].par)||4):4,hcap:hs?(parseInt(hs[i].hcap)||null):null,shots:[],done:false})),
-      cur:SETUP.start-1};
+      cur:Math.min(SETUP.start-1,n-1)};
     save();
   }
   closeSetup();
@@ -693,19 +699,31 @@ function startGps(){
   WATCH=navigator.geolocation.watchPosition(p=>{
     const first=!POS;
     POS={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};
-    document.getElementById("gpsBtn").textContent="🧍";
-    document.getElementById("gpsBtn").style.borderColor="var(--teal)";
+    const onHole=onCourseNow();
+    document.getElementById("gpsBtn").textContent=onHole?"🧍":"🧍?";
+    document.getElementById("gpsBtn").style.borderColor=onHole?"var(--teal)":"var(--hudline)";
     if(map){
-      if(!youMarker)youMarker=L.marker([POS.lat,POS.lng],{interactive:false,icon:L.divIcon({className:"",html:"<div class='youDot'></div>",iconAnchor:[8,8]})}).addTo(map);
-      else youMarker.setLatLng([POS.lat,POS.lng]);
+      // only show the you-dot when you're actually near this hole, so a far-away
+      // (testing-from-home) fix never drags the view off the selected course
+      if(onHole){
+        if(!youMarker)youMarker=L.marker([POS.lat,POS.lng],{interactive:false,icon:L.divIcon({className:"",html:"<div class='youDot'></div>",iconAnchor:[8,8]})}).addTo(map);
+        else youMarker.setLatLng([POS.lat,POS.lng]);
+      }else if(youMarker){youMarker.remove();youMarker=null;}
     }
-    if(first&&!COURSE)map.setView([POS.lat,POS.lng],17);
+    if(first&&onHole&&!COURSE)map.setView([POS.lat,POS.lng],17);
     recalcHole();
   },e=>{document.getElementById("gpsBtn").textContent="🚫";WATCH=null;
     toast("GPS blocked — tap the map to aim, distances from tee");},
   {enableHighAccuracy:true,maximumAge:2000,timeout:20000});
 }
-function effPos(){return POS||TEEPOS;}
+function onCourseNow(){
+  // "on the hole" only if the live fix is near this hole's tee or green —
+  // otherwise (e.g. testing from home) we use the tee so it never jumps to the nearest hole
+  if(!POS)return false;
+  const refs=[TEEPOS,FLAG].filter(Boolean);
+  return refs.some(r=>distYds(POS,r)<900);
+}
+function effPos(){return onCourseNow()?POS:TEEPOS;}
 function clubAverages(){
   const acc={};
   const scan=r=>r.holes.forEach(h=>h.shots.forEach((s,i)=>{
@@ -832,11 +850,9 @@ function recalcHole(){
     layup=planLayup(raw,p,tgt);
     rec={club:layup.club,note:"optimal"};
   }else rec=recommend(e);
-  const idx=clubs.findIndex(c=>c.name===rec.club);
-  const neighbor=idx>=0?(clubs[idx+1]||clubs[idx-1]):null;
   document.getElementById("pillClub").textContent=shortName(rec.club);
   document.getElementById("pillOpt").textContent=layup?"optimal · leaves "+Math.round(layup.leaves)+" yd":(e!==raw?rec.note+" · plays "+e:rec.note);
-  document.getElementById("pillAlt").textContent=neighbor?shortName(neighbor.name):"";
+  document.getElementById("pillAlt").textContent="";
   pill.style.display="flex";
   // aim graphics
   if(map){
