@@ -314,6 +314,18 @@ function slicePolyline(pts,startYd,endYd){
   return out;
 }
 function polylineLen(pts){let t=0;for(let i=0;i<pts.length-1;i++)t+=distYds(pts[i],pts[i+1]);return t;}
+function pointInPoly(pt,poly){
+  let inside=false;
+  for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+    const yi=poly[i].lat,xi=poly[i].lng,yj=poly[j].lat,xj=poly[j].lng;
+    if(((yi>pt.lat)!==(yj>pt.lat))&&(pt.lng<(xj-xi)*(pt.lat-yi)/(yj-yi)+xi))inside=!inside;
+  }
+  return inside;
+}
+function polyArea(pts){
+  let a=0;for(let i=0,j=pts.length-1;i<pts.length;j=i++)a+=(pts[j].lng+pts[i].lng)*(pts[j].lat-pts[i].lat);
+  return Math.abs(a/2);
+}
 function centroid(pts){
   let lat=0,lng=0,n=0;
   for(let i=0;i<pts.length;i++){
@@ -502,21 +514,35 @@ out geom;`;
   try{
     const res=await fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:"data="+encodeURIComponent(q)});
     const data=await res.json();
-    COURSE={name:c.name,center:{lat:c.lat,lng:c.lng},greens:[],bunkers:[],fairways:[],tees:[],water:[],holes:[],boundary:[],holesSorted:[]};
+    // collect everything first, then clip to the ONE course boundary we selected
+    const raw={greens:[],bunkers:[],fairways:[],tees:[],water:[],holes:[],boundaries:[]};
     for(const el of data.elements){
       if(el.type!=="way"||!el.geometry||el.geometry.length<2)continue;
       const pts=el.geometry.map(g=>({lat:g.lat,lng:g.lon}));
       const tags=el.tags||{};
-      if(tags.golf==="hole"){COURSE.holes.push({pts,ref:tags.ref||null,par:tags.par||null,hcap:tags.handicap||null});continue;}
+      if(tags.golf==="hole"){raw.holes.push({pts,ref:tags.ref||null,par:tags.par||null,hcap:tags.handicap||null});continue;}
       if(el.geometry.length<3)continue;
-      if(tags.golf==="green")COURSE.greens.push({pts,ref:tags.ref||null});
-      else if(tags.golf==="bunker")COURSE.bunkers.push({pts});
-      else if(tags.golf==="fairway")COURSE.fairways.push({pts});
-      else if(tags.golf==="tee")COURSE.tees.push({pts,ref:tags.ref||null});
-      else if(tags.golf==="water_hazard"||tags.natural==="water")COURSE.water.push({pts});
-      else if(tags.leisure==="golf_course")COURSE.boundary.push({pts});
+      if(tags.golf==="green")raw.greens.push({pts,ref:tags.ref||null});
+      else if(tags.golf==="bunker")raw.bunkers.push({pts});
+      else if(tags.golf==="fairway")raw.fairways.push({pts});
+      else if(tags.golf==="tee")raw.tees.push({pts,ref:tags.ref||null});
+      else if(tags.golf==="water_hazard"||tags.natural==="water")raw.water.push({pts});
+      else if(tags.leisure==="golf_course")raw.boundaries.push({pts});
     }
+    // pick the boundary that contains the selected course's center (else the nearest one)
+    const ctr={lat:c.lat,lng:c.lng};
+    let bound=raw.boundaries.find(b=>pointInPoly(ctr,b.pts));
+    if(!bound&&raw.boundaries.length)
+      bound=raw.boundaries.slice().sort((a,b)=>distYds(centroid(a.pts),ctr)-distYds(centroid(b.pts),ctr))[0];
+    // keep only features inside that boundary; if no boundary mapped, fall back to a tight radius
+    const keep=pts=>{const k=centroid(pts);return bound?pointInPoly(k,bound.pts):distYds(k,ctr)<1300;};
+    const filt=arr=>arr.filter(f=>keep(f.pts));
+    COURSE={name:c.name,center:ctr,
+      greens:filt(raw.greens),bunkers:filt(raw.bunkers),fairways:filt(raw.fairways),
+      tees:filt(raw.tees),water:filt(raw.water),holes:filt(raw.holes),
+      boundary:bound?[bound]:[],holesSorted:[]};
     COURSE.holesSorted=COURSE.holes.filter(h=>h.ref!==null&&!isNaN(parseInt(h.ref))).sort((a,b)=>parseInt(a.ref)-parseInt(b.ref));
+    synthHoles(COURSE);   // rebuild holes from greens+tees when OSM has no hole centerlines
     saveCourse();
     COURSEDRAWN=false;
     renderSetup();
@@ -524,6 +550,20 @@ out geom;`;
     const el=document.getElementById("loadNote");
     if(el)el.textContent="Course map unavailable — GPS distances still work.";
   }
+}
+function synthHoles(course){
+  if(course.holesSorted.length||!course.greens.length)return;
+  const tees=course.tees.map(t=>({c:centroid(t.pts)}));
+  const built=course.greens.map((g,i)=>{
+    const gc=centroid(g.pts);
+    let tee=null,bd=1e9;
+    for(const t of tees){const d=distYds(t.c,gc);if(d>110&&d<650&&d<bd){bd=d;tee=t;}}
+    if(!tee)tee={c:offsetPt(gc,bearing(gc,course.center),175)}; // fallback: aim toward clubhouse
+    return{pts:[tee.c,gc],ref:g.ref||String(i+1),par:null,hcap:null,synth:true};
+  });
+  const numbered=built.filter(h=>!isNaN(parseInt(h.ref)));
+  course.holesSorted=(numbered.length?numbered:built).sort((a,b)=>parseInt(a.ref)-parseInt(b.ref));
+  course.holes=course.holesSorted;
 }
 function nearestGreenTo(pt){
   let best={green:null,d:Infinity};
