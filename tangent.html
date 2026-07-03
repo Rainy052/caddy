@@ -563,7 +563,12 @@ async function loadCourse(c){
  relation["leisure"="golf_course"](around:2500,${c.lat},${c.lng}););
 out geom;`;
   try{
-    const data=await ovpFetch(q);
+    // two full passes over the mirror chain — the map servers rate-limit under load
+    let data=null,ferr=null;
+    for(let att=0;att<2&&!data;att++){
+      try{data=await ovpFetch(q);}catch(e){ferr=e;await new Promise(r=>setTimeout(r,2500));}
+    }
+    if(!data)throw ferr||new Error("no data");
     // collect everything first, then clip to the ONE course boundary we selected
     const raw={greens:[],bunkers:[],fairways:[],tees:[],water:[],holes:[],boundaries:[]};
     const sortRaw=(tags,pts,fromRel)=>{
@@ -717,6 +722,11 @@ async function startRound(explore){
     const note=document.getElementById("loadNote");if(note)note.textContent="Loading course map…";
     await loadCourse(c);
   }
+  if(!COURSE||COURSE.name!==c.name){
+    alert("Couldn't download the "+c.name+" course map — the free map server is busy.\n\nWait a few seconds and tap Play again.");
+    const note=document.getElementById("loadNote");if(note)note.textContent="Map load failed — tap Play to retry.";
+    return;
+  }
   const hs=(COURSE&&COURSE.name===c.name&&COURSE.holesSorted.length)?COURSE.holesSorted:null;
   const n=hs?hs.length:(c.holes||18);
   if(!explore){
@@ -756,6 +766,16 @@ const HSTYLE={
   holeFwy:{color:"#7bef86",weight:1.5,opacity:.6,fillColor:"#5fe071",fillOpacity:.46,interactive:false}
 };
 function enterHole(){
+  // never show another course's geometry: if the cache belongs to a different
+  // course than this round, wipe it (map-less play until a reload succeeds)
+  const want=EXPLORE?(SETUP.course&&SETUP.course.name):(S.active&&S.active.course);
+  if(COURSE&&want&&COURSE.name!==want){
+    COURSE=null;COURSEDRAWN=false;greenPolys=[];FLAG=null;GREEN=null;TEEPOS=null;
+    if(courseLayer)courseLayer.clearLayers();
+    if(holeLayer)holeLayer.clearLayers();
+    if(flagMarker){flagMarker.remove();flagMarker=null;}
+    if(teeMarker){teeMarker.remove();teeMarker=null;}
+  }
   document.getElementById("holeScreen").classList.remove("hidden");
   if(!map)initHoleMap();
   drawCourseLayers();
@@ -839,7 +859,13 @@ function showHole(i){
     map.fitBounds(L.latLngBounds(hg.pts.map(p=>[p.lat,p.lng])).pad(0.35));
     if(!teeMarker)teeMarker=L.marker([teeEnd.lat,teeEnd.lng],{interactive:false,icon:L.divIcon({className:"",html:"<div class='teeDot'></div>",iconAnchor:[8,8]})}).addTo(map);
     else teeMarker.setLatLng([teeEnd.lat,teeEnd.lng]);
-  }else if(map&&COURSE){map.setView([COURSE.center.lat,COURSE.center.lng],16);FLAG=null;GREEN=null;if(holeLayer)holeLayer.clearLayers();}
+  }else{
+    FLAG=null;GREEN=null;
+    if(holeLayer)holeLayer.clearLayers();
+    if(flagMarker){flagMarker.remove();flagMarker=null;}
+    if(map&&COURSE)map.setView([COURSE.center.lat,COURSE.center.lng],16);
+    else if(map&&POS)map.setView([POS.lat,POS.lng],16);
+  }
   updateHoleHud();
   drawHoleShots();
   fetchElev(false);
