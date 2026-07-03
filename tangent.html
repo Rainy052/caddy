@@ -340,6 +340,27 @@ function polyArea(pts){
   let a=0;for(let i=0,j=pts.length-1;i<pts.length;j=i++)a+=(pts[j].lng+pts[i].lng)*(pts[j].lat-pts[i].lat);
   return Math.abs(a/2);
 }
+function stitchRings(segs){
+  // join way segments that share endpoints into closed rings (for OSM multipolygons)
+  segs=segs.filter(s=>s&&s.length>1).map(s=>s.slice());
+  const eq=(a,b)=>Math.abs(a.lat-b.lat)<1e-7&&Math.abs(a.lng-b.lng)<1e-7;
+  const rings=[];
+  while(segs.length){
+    let ring=segs.shift(),changed=true;
+    while(changed&&!eq(ring[0],ring[ring.length-1])){
+      changed=false;
+      for(let i=0;i<segs.length;i++){
+        const s=segs[i];
+        if(eq(ring[ring.length-1],s[0])){ring=ring.concat(s.slice(1));segs.splice(i,1);changed=true;break;}
+        if(eq(ring[ring.length-1],s[s.length-1])){ring=ring.concat(s.slice(0,-1).reverse());segs.splice(i,1);changed=true;break;}
+        if(eq(ring[0],s[s.length-1])){ring=s.slice(0,-1).concat(ring);segs.splice(i,1);changed=true;break;}
+        if(eq(ring[0],s[0])){ring=s.slice(1).reverse().concat(ring);segs.splice(i,1);changed=true;break;}
+      }
+    }
+    if(ring.length>=3)rings.push(ring);
+  }
+  return rings;
+}
 function centroid(pts){
   let lat=0,lng=0,n=0;
   for(let i=0;i<pts.length;i++){
@@ -418,11 +439,25 @@ function findNearby(){
     fetchNearby(LISTPOS);
   },e=>alert("GPS error: "+e.message+"\n(Needs HTTPS + location permission)"),{enableHighAccuracy:true,timeout:15000});
 }
+// Overpass with mirror fallback — the main server rate-limits, mirrors pick up the slack
+const OVP_EPS=["https://overpass-api.de/api/interpreter","https://maps.mail.ru/osm/tools/overpass/api/interpreter","https://overpass.kumi.systems/api/interpreter"];
+async function ovpFetch(q){
+  let lastErr=null;
+  for(const ep of OVP_EPS){
+    try{
+      const res=await fetch(ep,{method:"POST",body:"data="+encodeURIComponent(q)});
+      if(!res.ok)throw new Error("HTTP "+res.status);
+      const d=await res.json();
+      if(d&&d.elements)return d;
+      throw new Error("bad payload");
+    }catch(e){lastErr=e;}
+  }
+  throw lastErr||new Error("all Overpass mirrors failed");
+}
 async function fetchNearby(pos){
   const q=`[out:json][timeout:25];(way["leisure"="golf_course"](around:25000,${pos.lat},${pos.lng});relation["leisure"="golf_course"](around:25000,${pos.lat},${pos.lng}););out center tags;`;
   try{
-    const res=await fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:"data="+encodeURIComponent(q)});
-    const data=await res.json();
+    const data=await ovpFetch(q);
     const seen={};NEARBY=[];
     for(const el of data.elements){
       const t=el.tags||{};if(!t.name||seen[t.name])continue;seen[t.name]=1;
@@ -523,38 +558,66 @@ async function loadCourse(c){
  way["golf"="hole"](around:2500,${c.lat},${c.lng});
  way["golf"="water_hazard"](around:2500,${c.lat},${c.lng});
  way["natural"="water"](around:2500,${c.lat},${c.lng});
- way["leisure"="golf_course"](around:2500,${c.lat},${c.lng}););
+ way["leisure"="golf_course"](around:2500,${c.lat},${c.lng});
+ relation["golf"~"fairway|green|bunker|tee|water_hazard"](around:2500,${c.lat},${c.lng});
+ relation["leisure"="golf_course"](around:2500,${c.lat},${c.lng}););
 out geom;`;
   try{
-    const res=await fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:"data="+encodeURIComponent(q)});
-    const data=await res.json();
+    const data=await ovpFetch(q);
     // collect everything first, then clip to the ONE course boundary we selected
     const raw={greens:[],bunkers:[],fairways:[],tees:[],water:[],holes:[],boundaries:[]};
-    for(const el of data.elements){
-      if(el.type!=="way"||!el.geometry||el.geometry.length<2)continue;
-      const pts=el.geometry.map(g=>({lat:g.lat,lng:g.lon}));
-      const tags=el.tags||{};
-      if(tags.golf==="hole"){raw.holes.push({pts,ref:tags.ref||null,par:tags.par||null,hcap:tags.handicap||null});continue;}
-      if(el.geometry.length<3)continue;
+    const sortRaw=(tags,pts,fromRel)=>{
+      if(pts.length<3)return;
       if(tags.golf==="green")raw.greens.push({pts,ref:tags.ref||null});
       else if(tags.golf==="bunker")raw.bunkers.push({pts});
       else if(tags.golf==="fairway")raw.fairways.push({pts});
       else if(tags.golf==="tee")raw.tees.push({pts,ref:tags.ref||null});
       else if(tags.golf==="water_hazard"||tags.natural==="water")raw.water.push({pts});
       else if(tags.leisure==="golf_course")raw.boundaries.push({pts});
+    };
+    for(const el of data.elements){
+      const tags=el.tags||{};
+      if(el.type==="relation"&&el.members){
+        // multipolygon (e.g. Maplewood's fairways) — stitch outer member ways into rings
+        const outers=el.members.filter(m=>m.type==="way"&&m.geometry&&m.role!=="inner")
+          .map(m=>m.geometry.map(g=>({lat:g.lat,lng:g.lon})));
+        for(const ring of stitchRings(outers))sortRaw(tags,ring,true);
+        continue;
+      }
+      if(el.type!=="way"||!el.geometry||el.geometry.length<2)continue;
+      const pts=el.geometry.map(g=>({lat:g.lat,lng:g.lon}));
+      if(tags.golf==="hole"){raw.holes.push({pts,ref:tags.ref||null,par:tags.par||null,hcap:tags.handicap||null});continue;}
+      sortRaw(tags,pts,false);
     }
-    // pick the boundary that contains the selected course's center (else the nearest one)
+    // keep every boundary ring belonging to the selected course (a course split by a
+    // river/road has several rings) — rings of the neighbouring course are far away
     const ctr={lat:c.lat,lng:c.lng};
-    let bound=raw.boundaries.find(b=>pointInPoly(ctr,b.pts));
-    if(!bound&&raw.boundaries.length)
-      bound=raw.boundaries.slice().sort((a,b)=>distYds(centroid(a.pts),ctr)-distYds(centroid(b.pts),ctr))[0];
-    // keep only features inside that boundary; if no boundary mapped, fall back to a tight radius
-    const keep=pts=>{const k=centroid(pts);return bound?pointInPoly(k,bound.pts):distYds(k,ctr)<1300;};
+    const rings=raw.boundaries.filter(b=>pointInPoly(ctr,b.pts)||distYds(centroid(b.pts),ctr)<1500);
+    let keep;
+    if(rings.length){
+      // inside any of our rings, or close to the course center (safety net for gaps in stitched rings)
+      keep=pts=>{const k=centroid(pts);return rings.some(r=>pointInPoly(k,r.pts))||distYds(k,ctr)<1000;};
+    }else{
+      // no boundary mapped: grow a cluster outward from the course center so a long
+      // course keeps all its features, but the neighbouring course (a big gap away) doesn't join
+      const all=[];
+      for(const k of["greens","bunkers","fairways","tees","water","holes"])
+        for(const f of raw[k])all.push({c:centroid(f.pts),keep:false});
+      for(const f of all)if(distYds(f.c,ctr)<1000)f.keep=true;
+      let grew=true;
+      while(grew){
+        grew=false;
+        for(const f of all)if(!f.keep)
+          for(const g of all)if(g.keep&&distYds(f.c,g.c)<450){f.keep=true;grew=true;break;}
+      }
+      const kept=all.filter(f=>f.keep).map(f=>f.c);
+      keep=pts=>{const k=centroid(pts);return kept.some(c=>distYds(k,c)<30)||distYds(k,ctr)<1000;};
+    }
     const filt=arr=>arr.filter(f=>keep(f.pts));
     COURSE={name:c.name,center:ctr,
       greens:filt(raw.greens),bunkers:filt(raw.bunkers),fairways:filt(raw.fairways),
       tees:filt(raw.tees),water:filt(raw.water),holes:filt(raw.holes),
-      boundary:bound?[bound]:[],holesSorted:[]};
+      boundary:rings,holesSorted:[]};
     COURSE.holesSorted=COURSE.holes.filter(h=>h.ref!==null&&!isNaN(parseInt(h.ref))).sort((a,b)=>parseInt(a.ref)-parseInt(b.ref));
     synthHoles(COURSE);   // rebuild holes from greens+tees when OSM has no hole centerlines
     saveCourse();
@@ -568,22 +631,70 @@ out geom;`;
 function synthHoles(course){
   if(course.holesSorted.length||!course.greens.length)return;
   const tees=course.tees.map(t=>({c:centroid(t.pts),ref:t.ref&&!isNaN(parseInt(t.ref))?parseInt(t.ref):null}));
+  // assign each fairway polygon to the green it ends nearest to (keep the biggest per green)
+  const fwyByGreen={};
+  course.fairways.forEach(f=>{
+    let gi=-1,gd=110;
+    course.greens.forEach((g,idx)=>{
+      const gc=centroid(g.pts);
+      let dmin=1e9;for(const p of f.pts){const d=distYds(p,gc);if(d<dmin)dmin=d;}
+      if(dmin<gd){gd=dmin;gi=idx;}
+    });
+    if(gi>=0&&(!fwyByGreen[gi]||polyArea(f.pts)>polyArea(fwyByGreen[gi].pts)))fwyByGreen[gi]=f;
+  });
   const built=course.greens.map((g,i)=>{
     const gc=centroid(g.pts);
     const gref=g.ref&&!isNaN(parseInt(g.ref))?parseInt(g.ref):null;
-    let tee=null,bd=1e9;
-    // prefer the tee tagged with the SAME hole number (farthest such tee = the back tee)
-    if(gref!=null){
-      let far=-1;
-      for(const t of tees){if(t.ref===gref){const d=distYds(t.c,gc);if(d>60&&d<700&&d>far){far=d;tee=t;}}}
+    const fw=fwyByGreen[i];
+    let line;
+    if(fw){
+      // route the hole THROUGH its fairway: tee end = fairway vertex farthest from the green
+      let far=null,fdd=-1;for(const p of fw.pts){const d=distYds(p,gc);if(d>fdd){fdd=d;far=p;}}
+      const fc=centroid(fw.pts);
+      // back tee = tee near the fairway's tee end, farthest from the green
+      let tee=null,best=-1;
+      for(const t of tees){if(distYds(t.c,far)<170){const dG=distYds(t.c,gc);if(dG>best){best=dG;tee=t.c;}}}
+      if(!tee)tee=offsetPt(far,bearing(gc,far),20);
+      line=[tee,fc,gc];
+    }else{
+      // no fairway (par 3): tee straight to green
+      let tee=null,bd=1e9;
+      if(gref!=null){let farD=-1;for(const t of tees){if(t.ref===gref){const d=distYds(t.c,gc);if(d>60&&d<700&&d>farD){farD=d;tee=t.c;}}}}
+      if(!tee)for(const t of tees){const d=distYds(t.c,gc);if(d>90&&d<650&&d<bd){bd=d;tee=t.c;}}
+      if(!tee)tee=offsetPt(gc,bearing(gc,course.center),175);
+      line=[tee,gc];
     }
-    // else nearest plausible tee
-    if(!tee)for(const t of tees){const d=distYds(t.c,gc);if(d>110&&d<650&&d<bd){bd=d;tee=t;}}
-    if(!tee)tee={c:offsetPt(gc,bearing(gc,course.center),175)}; // fallback: aim toward clubhouse
-    return{pts:[tee.c,gc],ref:g.ref||String(i+1),par:null,hcap:null,synth:true};
+    const len=polylineLen(line);
+    const par=len<240?"3":len<490?"4":"5";
+    return{pts:line,ref:g.ref||String(i+1),par,hcap:null,synth:true,realRef:gref!=null};
   });
-  const numbered=built.filter(h=>!isNaN(parseInt(h.ref)));
-  course.holesSorted=(numbered.length?numbered:built).sort((a,b)=>parseInt(a.ref)-parseInt(b.ref));
+  const realCount=built.filter(h=>h.realRef).length;
+  if(realCount>=Math.min(9,course.greens.length/2)){
+    // most greens are numbered: trust the numbers, slot unnumbered greens into the
+    // missing hole numbers (best neighbour fit), drop leftovers (practice greens)
+    const real=built.filter(h=>h.realRef),un=built.filter(h=>!h.realRef);
+    const byRef={};
+    real.forEach(h=>{const k=parseInt(h.ref);if(!byRef[k]||polylineLen(h.pts)>polylineLen(byRef[k].pts))byRef[k]=h;});
+    const maxRef=Math.max(...Object.keys(byRef).map(Number));
+    const target=maxRef>=15?18:maxRef;
+    const greenOf=h=>h.pts[h.pts.length-1];
+    const assigned=new Set();
+    for(let m=1;m<=target;m++){
+      if(byRef[m])continue;
+      let best=null,bs=1e12;
+      un.forEach((h,ui)=>{
+        if(assigned.has(ui))return;
+        let s=0,n=0;
+        [m-1,m+1].forEach(nb=>{if(byRef[nb]){s+=distYds(greenOf(h),greenOf(byRef[nb]));n++;}});
+        if(n){s/=n;if(s<bs){bs=s;best=ui;}}
+      });
+      if(best!=null&&bs<900){assigned.add(best);un[best].ref=String(m);byRef[m]=un[best];}
+    }
+    course.holesSorted=Object.values(byRef).sort((a,b)=>parseInt(a.ref)-parseInt(b.ref));
+  }else{
+    const numbered=built.filter(h=>!isNaN(parseInt(h.ref)));
+    course.holesSorted=(numbered.length?numbered:built).sort((a,b)=>parseInt(a.ref)-parseInt(b.ref));
+  }
   course.holes=course.holesSorted;
 }
 function nearestGreenTo(pt){
@@ -636,7 +747,7 @@ let WINDMODE="auto",WINDMAN=0;
 let ELEV={ft:null},ELEVKEY=null;
 const HSTYLE={
   rough:{stroke:false,fillColor:"#132e0e",fillOpacity:.30,interactive:false},
-  fairway:{color:"#5ce86f",weight:1.5,opacity:.55,fillColor:"#57dd68",fillOpacity:.34,interactive:false},
+  fairway:{color:"#54e866",weight:1.5,opacity:.75,fillColor:"#4fdd60",fillOpacity:.45,interactive:false},
   tee:{color:"#ffffff",weight:1.5,opacity:.85,fillColor:"#57dd68",fillOpacity:.45,interactive:false},
   bunker:{color:"#3a3320",weight:1.5,opacity:.95,fillColor:"#efe07a",fillOpacity:.92,interactive:false},
   water:{color:"#3fe3d0",weight:1.5,opacity:.95,fillColor:"#37c4d6",fillOpacity:.6,interactive:false},
@@ -685,20 +796,31 @@ function holeGeom(i){
   if(!COURSE||!COURSE.holesSorted.length)return null;
   return COURSE.holesSorted[Math.min(i,COURSE.holesSorted.length-1)]||null;
 }
+function realFairwayNear(center){
+  // does OSM have hand-mapped fairway polygons along this hole? then don't draw our synthetic ribbon
+  if(!COURSE||!COURSE.fairways||!COURSE.fairways.length)return false;
+  const samples=[];
+  const total=polylineLen(center);
+  for(let d=total*0.25;d<=total*0.85;d+=Math.max(40,total*0.2))
+    samples.push(...slicePolyline(center,d,d+1));
+  return COURSE.fairways.some(f=>{const fc=centroid(f.pts);return samples.some(s=>distYds(fc,s)<90)||samples.some(s=>pointInPoly(s,f.pts));});
+}
 function drawHoleCorridor(center){
   if(!holeLayer)return;
   holeLayer.clearLayers();
   if(!center||center.length<2)return;
   const total=polylineLen(center);
   if(total<40)return;
-  // shaded hole corridor (rough) — full length, wide
+  // synthetic fairway ribbon only where OSM has no real fairway shapes (and not on par-3s)
+  if(total>=200&&!realFairwayNear(center)){
+    const fwyStart=Math.min(40,total*0.18),fwyEnd=Math.max(fwyStart+20,total-28);
+    const fwyLine=slicePolyline(center,fwyStart,fwyEnd);
+    const fwy=buildBuffer(fwyLine,16);
+    if(fwy.length)L.polygon(fwy.map(p=>[p.lat,p.lng]),HSTYLE.holeFwy).addTo(holeLayer).bringToBack();
+  }
+  // shaded hole corridor (rough) — full length, wide, UNDER the fairway shapes
   const corr=buildBuffer(center,32);
-  if(corr.length)L.polygon(corr.map(p=>[p.lat,p.lng]),HSTYLE.corridor).addTo(holeLayer);
-  // fairway ribbon — starts past the tee, stops short of the green
-  const fwyStart=Math.min(40,total*0.18),fwyEnd=Math.max(fwyStart+20,total-28);
-  const fwyLine=slicePolyline(center,fwyStart,fwyEnd);
-  const fwy=buildBuffer(fwyLine,16);
-  if(fwy.length)L.polygon(fwy.map(p=>[p.lat,p.lng]),HSTYLE.holeFwy).addTo(holeLayer);
+  if(corr.length)L.polygon(corr.map(p=>[p.lat,p.lng]),HSTYLE.corridor).addTo(holeLayer).bringToBack();
 }
 function showHole(i){
   if(!EXPLORE){S.active.cur=i;save();}
