@@ -223,7 +223,8 @@ function load(){try{const d=JSON.parse(localStorage.getItem("tangent_v1"));if(d&
 function save(){localStorage.setItem("tangent_v1",JSON.stringify(S));}
 function today(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
 function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
-let COURSE=null; try{COURSE=JSON.parse(localStorage.getItem("tangent_course"));}catch(e){}
+const CVER=8; // bump whenever the course parser changes — invalidates stale phone caches
+let COURSE=null; try{COURSE=JSON.parse(localStorage.getItem("tangent_course"));if(!COURSE||COURSE.v!==CVER)COURSE=null;}catch(e){COURSE=null;}
 function saveCourse(){localStorage.setItem("tangent_course",JSON.stringify(COURSE));}
 
 /* ============ STROKES GAINED (Broadie scratch baseline) ============ */
@@ -549,18 +550,18 @@ async function fetchWeather(c){
 
 /* ================= COURSE DATA (Overpass) ================= */
 async function loadCourse(c){
-  if(COURSE&&COURSE.name===c.name&&COURSE.greens){if(document.getElementById("loadNote"))document.getElementById("loadNote").textContent="";renderSetup();return;}
+  if(COURSE&&COURSE.v===CVER&&COURSE.name===c.name&&COURSE.greens){if(document.getElementById("loadNote"))document.getElementById("loadNote").textContent="";renderSetup();return;}
   const q=`[out:json][timeout:25];
-(way["golf"="green"](around:2500,${c.lat},${c.lng});
- way["golf"="bunker"](around:2500,${c.lat},${c.lng});
- way["golf"="fairway"](around:2500,${c.lat},${c.lng});
- way["golf"="tee"](around:2500,${c.lat},${c.lng});
- way["golf"="hole"](around:2500,${c.lat},${c.lng});
- way["golf"="water_hazard"](around:2500,${c.lat},${c.lng});
- way["natural"="water"](around:2500,${c.lat},${c.lng});
- way["leisure"="golf_course"](around:2500,${c.lat},${c.lng});
- relation["golf"~"fairway|green|bunker|tee|water_hazard"](around:2500,${c.lat},${c.lng});
- relation["leisure"="golf_course"](around:2500,${c.lat},${c.lng}););
+(way["golf"="green"](around:3200,${c.lat},${c.lng});
+ way["golf"="bunker"](around:3200,${c.lat},${c.lng});
+ way["golf"="fairway"](around:3200,${c.lat},${c.lng});
+ way["golf"="tee"](around:3200,${c.lat},${c.lng});
+ way["golf"="hole"](around:3200,${c.lat},${c.lng});
+ way["golf"="water_hazard"](around:3200,${c.lat},${c.lng});
+ way["natural"="water"](around:3200,${c.lat},${c.lng});
+ way["leisure"="golf_course"](around:3200,${c.lat},${c.lng});
+ relation["golf"~"fairway|green|bunker|tee|water_hazard"](around:3200,${c.lat},${c.lng});
+ relation["leisure"="golf_course"](around:3200,${c.lat},${c.lng}););
 out geom;`;
   try{
     // two full passes over the mirror chain — the map servers rate-limit under load
@@ -619,7 +620,7 @@ out geom;`;
       keep=pts=>{const k=centroid(pts);return kept.some(c=>distYds(k,c)<30)||distYds(k,ctr)<1000;};
     }
     const filt=arr=>arr.filter(f=>keep(f.pts));
-    COURSE={name:c.name,center:ctr,
+    COURSE={v:CVER,name:c.name,center:ctr,
       greens:filt(raw.greens),bunkers:filt(raw.bunkers),fairways:filt(raw.fairways),
       tees:filt(raw.tees),water:filt(raw.water),holes:filt(raw.holes),
       boundary:rings,holesSorted:[]};
@@ -816,14 +817,32 @@ function holeGeom(i){
   if(!COURSE||!COURSE.holesSorted.length)return null;
   return COURSE.holesSorted[Math.min(i,COURSE.holesSorted.length-1)]||null;
 }
-function realFairwayNear(center){
-  // does OSM have hand-mapped fairway polygons along this hole? then don't draw our synthetic ribbon
-  if(!COURSE||!COURSE.fairways||!COURSE.fairways.length)return false;
-  const samples=[];
+// per-hole fairway cache: which fairway polygons belong to the current hole,
+// plus a grid of points inside them (used to keep the layup target on the short grass)
+let HOLEFWY={polys:[],samples:[]};
+function buildHoleFwy(center){
+  HOLEFWY={polys:[],samples:[]};
+  if(!COURSE||!COURSE.fairways||!COURSE.fairways.length||!center||center.length<2)return;
   const total=polylineLen(center);
-  for(let d=total*0.25;d<=total*0.85;d+=Math.max(40,total*0.2))
-    samples.push(...slicePolyline(center,d,d+1));
-  return COURSE.fairways.some(f=>{const fc=centroid(f.pts);return samples.some(s=>distYds(fc,s)<90)||samples.some(s=>pointInPoly(s,f.pts));});
+  const line=[];
+  for(let d=20;d<total-10;d+=25)line.push(...slicePolyline(center,d,d+1));
+  HOLEFWY.polys=COURSE.fairways.filter(f=>line.some(s=>pointInPoly(s,f.pts)));
+  for(const f of HOLEFWY.polys){
+    let mnLa=90,mxLa=-90,mnLo=180,mxLo=-180;
+    for(const p of f.pts){mnLa=Math.min(mnLa,p.lat);mxLa=Math.max(mxLa,p.lat);mnLo=Math.min(mnLo,p.lng);mxLo=Math.max(mxLo,p.lng);}
+    const stepLa=(mxLa-mnLa)/13,stepLo=(mxLo-mnLo)/13;
+    if(stepLa<=0||stepLo<=0)continue;
+    for(let a=mnLa+stepLa/2;a<mxLa;a+=stepLa)
+      for(let o=mnLo+stepLo/2;o<mxLo;o+=stepLo){
+        const pt={lat:a,lng:o};
+        if(pointInPoly(pt,f.pts))HOLEFWY.samples.push(pt);
+      }
+  }
+}
+function realFairwayNear(center){
+  // only true if a hand-mapped fairway actually sits ON this hole's line —
+  // a neighbouring hole's fairway must not suppress our ribbon
+  return HOLEFWY.polys.length>0;
 }
 function drawHoleCorridor(center){
   if(!holeLayer)return;
@@ -854,13 +873,14 @@ function showHole(i){
     if(ga.d<gb.d){teeEnd=b;g=ga;}
     TEEPOS={lat:teeEnd.lat,lng:teeEnd.lng};
     const center=(teeEnd===a)?hg.pts:hg.pts.slice().reverse();
+    buildHoleFwy(center);
     drawHoleCorridor(center);
     setFlagOnGreen(g.green&&g.d<120?g.green:null,teeEnd===a?b:a);
     map.fitBounds(L.latLngBounds(hg.pts.map(p=>[p.lat,p.lng])).pad(0.35));
     if(!teeMarker)teeMarker=L.marker([teeEnd.lat,teeEnd.lng],{interactive:false,icon:L.divIcon({className:"",html:"<div class='teeDot'></div>",iconAnchor:[8,8]})}).addTo(map);
     else teeMarker.setLatLng([teeEnd.lat,teeEnd.lng]);
   }else{
-    FLAG=null;GREEN=null;
+    FLAG=null;GREEN=null;HOLEFWY={polys:[],samples:[]};
     if(holeLayer)holeLayer.clearLayers();
     if(flagMarker){flagMarker.remove();flagMarker=null;}
     if(map&&COURSE)map.setView([COURSE.center.lat,COURSE.center.lng],16);
@@ -1031,7 +1051,25 @@ function planLayup(rawDist,p,tgt){
   let choice=clubs[0];
   for(const c of clubs){if(rawDist-c.carry>=40){choice=c;break;}}
   const carry=Math.min(choice.carry,rawDist-10);
-  return{club:choice.name,carry,leaves:rawDist-carry,pt:lerpPoint(p,tgt,carry/rawDist)};
+  let pt=lerpPoint(p,tgt,carry/rawDist);
+  // if we know where the fairway is and the straight-line target misses it,
+  // steer the layup onto the short grass instead of through the trees
+  if(HOLEFWY.samples.length&&!HOLEFWY.polys.some(f=>pointInPoly(pt,f.pts))){
+    let best=null,bs=1e12;
+    for(const s of HOLEFWY.samples){
+      const d=distYds(p,s);
+      if(d>choice.carry+6||d<carry*0.45)continue;      // must be a real shot this club reaches
+      const score=distYds(s,tgt)+Math.abs(d-carry)*0.7; // most progress, comfortable distance
+      if(score<bs){bs=score;best={s,d};}
+    }
+    if(best){
+      // re-pick the club: shortest one that comfortably covers the new distance
+      let cl=choice;
+      for(let i=clubs.length-1;i>=0;i--){if(clubs[i].carry>=best.d-3){cl=clubs[i];break;}}
+      return{club:cl.name,carry:Math.round(best.d),leaves:Math.round(distYds(best.s,tgt)),pt:best.s};
+    }
+  }
+  return{club:choice.name,carry,leaves:rawDist-carry,pt};
 }
 function chipMarker(pt,html){return L.marker([pt.lat,pt.lng],{interactive:false,icon:L.divIcon({className:"",html,iconSize:[0,0]})});}
 function recalcHole(){
