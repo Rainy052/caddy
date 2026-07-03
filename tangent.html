@@ -156,6 +156,16 @@ nav button.on .ic{filter:drop-shadow(0 0 6px rgba(217,244,82,.5))}
 .bar .fill{position:absolute;top:0;bottom:0}
 .bar .v{width:44px;text-align:right;font-weight:700}
 .big{font-size:34px;font-weight:800}
+#markStack{position:absolute;z-index:950;left:12px;bottom:calc(150px + var(--sb));display:flex;flex-direction:column;gap:8px;align-items:center}
+#markBtn{min-width:66px;height:66px;border-radius:20px;background:var(--yellow);border:none;color:#122;
+  font-size:12px;font-weight:800;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  box-shadow:0 3px 12px rgba(0,0,0,.5);padding:0 8px;cursor:pointer}
+#markBtn .ic{font-size:24px;line-height:1}
+#markBtn.flash{background:#fff}
+#holedBtn{background:var(--hud);border:1.5px solid var(--hudline);color:#fff;font-size:11px;font-weight:700;
+  border-radius:14px;padding:7px 10px;cursor:pointer}
+.ballFrom{width:15px;height:15px;border-radius:50%;background:var(--yellow);border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,.6)}
+.ballDot{width:11px;height:11px;border-radius:50%;background:#fff;border:2px solid #111}
 </style>
 </head>
 <body>
@@ -185,6 +195,10 @@ nav button.on .ic{filter:drop-shadow(0 0 6px rgba(217,244,82,.5))}
     <button class="hudBtn" onclick="refitHole()" title="Recenter">↻</button>
     <button class="hudBtn" onclick="openLogSheet()" title="Log shot">✏️</button>
     <button class="hudBtn" onclick="openScorecard()" title="Scorecard">🗒</button>
+  </div>
+  <div id="markStack">
+    <button id="markBtn" onclick="markBall()"><span class="ic">📍</span>Mark ball</button>
+    <button id="holedBtn" onclick="holedIt()">🕳 Holed</button>
   </div>
   <div id="clubPill" style="display:none"><div><div class="club" id="pillClub">—</div><div class="opt" id="pillOpt">optimal</div></div><div class="altclub" id="pillAlt"></div></div>
   <div id="chipRow">
@@ -553,11 +567,18 @@ out geom;`;
 }
 function synthHoles(course){
   if(course.holesSorted.length||!course.greens.length)return;
-  const tees=course.tees.map(t=>({c:centroid(t.pts)}));
+  const tees=course.tees.map(t=>({c:centroid(t.pts),ref:t.ref&&!isNaN(parseInt(t.ref))?parseInt(t.ref):null}));
   const built=course.greens.map((g,i)=>{
     const gc=centroid(g.pts);
+    const gref=g.ref&&!isNaN(parseInt(g.ref))?parseInt(g.ref):null;
     let tee=null,bd=1e9;
-    for(const t of tees){const d=distYds(t.c,gc);if(d>110&&d<650&&d<bd){bd=d;tee=t;}}
+    // prefer the tee tagged with the SAME hole number (farthest such tee = the back tee)
+    if(gref!=null){
+      let far=-1;
+      for(const t of tees){if(t.ref===gref){const d=distYds(t.c,gc);if(d>60&&d<700&&d>far){far=d;tee=t;}}}
+    }
+    // else nearest plausible tee
+    if(!tee)for(const t of tees){const d=distYds(t.c,gc);if(d>110&&d<650&&d<bd){bd=d;tee=t;}}
     if(!tee)tee={c:offsetPt(gc,bearing(gc,course.center),175)}; // fallback: aim toward clubhouse
     return{pts:[tee.c,gc],ref:g.ref||String(i+1),par:null,hcap:null,synth:true};
   });
@@ -609,7 +630,7 @@ function resumeRound(){
 function curHole(){return S.active?S.active.holes[S.active.cur]:null;}
 
 /* ================= HOLE SCREEN / MAP ================= */
-let map=null,youMarker=null,teeMarker=null,flagMarker=null,courseLayer=null,holeLayer=null,aimLayer=null,greenPolys=[];
+let map=null,youMarker=null,teeMarker=null,flagMarker=null,fromMarker=null,courseLayer=null,holeLayer=null,shotLayer=null,aimLayer=null,greenPolys=[];
 let POS=null,TEEPOS=null,FLAG=null,AIM=null,GREEN=null,WATCH=null,COURSEDRAWN=false;
 let WINDMODE="auto",WINDMAN=0;
 let ELEV={ft:null},ELEVKEY=null;
@@ -640,6 +661,7 @@ function initHoleMap(){
   L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:20}).addTo(map);
   courseLayer=L.layerGroup().addTo(map);
   holeLayer=L.layerGroup().addTo(map);
+  shotLayer=L.layerGroup().addTo(map);
   aimLayer=L.layerGroup().addTo(map);
   map.on("click",e=>{AIM={lat:e.latlng.lat,lng:e.latlng.lng};recalcHole();});
 }
@@ -697,6 +719,7 @@ function showHole(i){
     else teeMarker.setLatLng([teeEnd.lat,teeEnd.lng]);
   }else if(map&&COURSE){map.setView([COURSE.center.lat,COURSE.center.lng],16);FLAG=null;GREEN=null;if(holeLayer)holeLayer.clearLayers();}
   updateHoleHud();
+  drawHoleShots();
   fetchElev(false);
   recalcHole();
 }
@@ -751,6 +774,11 @@ function startGps(){
       }else if(youMarker){youMarker.remove();youMarker=null;}
     }
     if(first&&onHole&&!COURSE)map.setView([POS.lat,POS.lng],17);
+    // auto-mark the tee the first time you're on the hole, so "Mark ball" just measures
+    if(onHole&&!EXPLORE&&S.active&&FLAG){
+      const h=curHole();
+      if(h&&!h.from&&!h.shots.length){setFrom({lat:POS.lat,lng:POS.lng,lie:"tee"});toast("Tee marked — walk to your ball, tap 📍");}
+    }
     recalcHole();
   },e=>{document.getElementById("gpsBtn").textContent="🚫";WATCH=null;
     toast("GPS blocked — tap the map to aim, distances from tee");},
@@ -768,9 +796,9 @@ function clubAverages(){
   const acc={};
   const scan=r=>r.holes.forEach(h=>h.shots.forEach((s,i)=>{
     if(!s.club||s.lie==="green")return;
-    const nxt=h.shots[i+1];
-    const end=nxt?(nxt.lie==="green"?nxt.dist/3:nxt.dist):0;
-    const len=s.dist-end;if(len>20){(acc[s.club]=acc[s.club]||[]).push(len);}
+    let len=s.length;   // GPS-measured shot distance, when present
+    if(len==null){const nxt=h.shots[i+1];const end=nxt?(nxt.lie==="green"?nxt.dist/3:nxt.dist):0;len=s.dist-end;}
+    if(len>20){(acc[s.club]=acc[s.club]||[]).push(len);}
   }));
   S.rounds.forEach(scan);if(S.active)scan(S.active);
   Object.keys(S.lm||{}).forEach(k=>{(acc[k]=acc[k]||[]).push(...S.lm[k]);});
@@ -916,7 +944,68 @@ function shortName(n){
   return n.replace(/\s+/g,"");
 }
 
-/* ================= SHOT LOGGING ================= */
+/* ================= GPS SHOT TRACKING (walk to your ball, tap Mark) ================= */
+function lieAt(pos){
+  if(!COURSE)return"fairway";
+  for(const g of COURSE.greens||[])if(pointInPoly(pos,g.pts))return"green";
+  for(const b of COURSE.bunkers||[])if(pointInPoly(pos,b.pts))return"sand";
+  for(const f of COURSE.fairways||[])if(pointInPoly(pos,f.pts))return"fairway";
+  return"rough";
+}
+function setFrom(fp){
+  const h=curHole();if(!h)return;
+  h.from=fp;save();
+  if(map){
+    if(!fromMarker)fromMarker=L.marker([fp.lat,fp.lng],{interactive:false,icon:L.divIcon({className:"",html:"<div class='ballFrom'></div>",iconAnchor:[8,8]})}).addTo(map);
+    else fromMarker.setLatLng([fp.lat,fp.lng]);
+  }
+}
+function drawShotLine(s){
+  if(!shotLayer||!s.from||!s.to)return;
+  L.polyline([[s.from.lat,s.from.lng],[s.to.lat,s.to.lng]],{color:"#ffd400",weight:3,opacity:.9}).addTo(shotLayer);
+  L.marker([s.to.lat,s.to.lng],{interactive:false,icon:L.divIcon({className:"",html:"<div class='ballDot'></div>",iconAnchor:[5,5]})}).addTo(shotLayer);
+}
+function drawHoleShots(){
+  if(!shotLayer)return;
+  shotLayer.clearLayers();
+  const h=EXPLORE?null:curHole();
+  if(!h)return;
+  h.shots.forEach(drawShotLine);
+  if(fromMarker){fromMarker.remove();fromMarker=null;}
+  if(h.from&&map){fromMarker=L.marker([h.from.lat,h.from.lng],{interactive:false,icon:L.divIcon({className:"",html:"<div class='ballFrom'></div>",iconAnchor:[8,8]})}).addTo(map);}
+}
+function flashMark(){const b=document.getElementById("markBtn");b.classList.add("flash");setTimeout(()=>b.classList.remove("flash"),400);}
+function markBall(){
+  if(EXPLORE){toast("Game plan mode — start the round to track shots");return;}
+  if(!onCourseNow()||!POS){toast("Stand at your ball with GPS on — or use ✏️ to log manually");return;}
+  if(!FLAG){toast("Tap the green to set the pin first");return;}
+  const h=curHole();
+  const end={lat:POS.lat,lng:POS.lng};
+  if(!h.from){setFrom({lat:end.lat,lng:end.lng,lie:h.shots.length?lieAt(end):"tee"});
+    toast(h.shots.length?"Position marked — walk to your next ball":"Tee marked — walk to your ball, then tap 📍");flashMark();return;}
+  const d=distYds(h.from,end);
+  if(d<5){toast("Walk to your ball, then tap 📍");return;}
+  const onG=h.from.lie==="green";
+  const shot={lie:h.from.lie,dist:onG?Math.round(distYds(h.from,FLAG)*3):Math.round(distYds(h.from,FLAG)),
+    club:onG?"Putter":null,pen:false,from:{lat:h.from.lat,lng:h.from.lng},to:end,length:onG?Math.round(d*3):Math.round(d)};
+  h.shots.push(shot);
+  drawShotLine(shot);
+  setFrom({lat:end.lat,lng:end.lng,lie:lieAt(end)});
+  save();updateHoleHud();flashMark();
+  toast("Shot "+h.shots.length+": "+shot.length+(onG?" ft":" yd"));
+  if(!onG)askClub(shot);
+}
+function askClub(shot){
+  const rec=recommend(Math.round(shot.length)).club;
+  sheet(`<h2 style="font-size:18px;margin-bottom:2px">Shot ${Math.round(shot.length)} yds — what club?</h2>
+    <div class="dim small mb">Optional — tags the shot so your bag learns your carries.</div>
+    <div class="chips">${S.bag.map(b=>`<div class="chip ${b.name===rec?"on":""}" onclick="tagClub('${esc(b.name)}')">${esc(b.name)}</div>`).join("")}</div>
+    <button class="btn sm mt" onclick="closeSheet()">Skip</button>`);
+  window._pendingShot=shot;
+}
+function tagClub(name){if(window._pendingShot){window._pendingShot.club=name;save();}window._pendingShot=null;closeSheet();}
+
+/* ================= MANUAL SHOT LOGGING (fallback) ================= */
 function openLogSheet(presetLie){
   if(EXPLORE){toast("Game plan mode — start the round to log shots");return;}
   const h=curHole();
@@ -965,7 +1054,18 @@ function logShot(){
   toast("Shot "+h.shots.length+" logged");
 }
 function holedIt(){
-  const h=curHole();h.done=true;save();closeSheet();
+  if(EXPLORE){toast("Game plan mode");return;}
+  const h=curHole();
+  // GPS mode: the ball is in the cup — record the final stroke from where you stand
+  if(h.from&&FLAG){
+    const onG=h.from.lie==="green";
+    const len=distYds(h.from,FLAG);
+    h.shots.push({lie:h.from.lie,dist:onG?Math.round(len*3):Math.round(len),club:onG?"Putter":null,pen:false,
+      from:{lat:h.from.lat,lng:h.from.lng},to:{lat:FLAG.lat,lng:FLAG.lng},length:onG?Math.round(len*3):Math.round(len)});
+    h.from=null;
+  }
+  if(!h.shots.length){toast("Log at least one shot first (📍 or ✏️)");return;}
+  h.done=true;save();closeSheet();
   const c=holeCalcS(h);
   toast(scoreName(c.strokes,h.par)+" — "+c.strokes,false);
   updateHoleHud();
