@@ -103,9 +103,11 @@ nav button.on .ic{filter:drop-shadow(0 0 6px rgba(217,244,82,.5))}
 #closeHole{position:absolute;z-index:950;top:calc(12px + var(--st));right:12px}
 #sideCol{position:absolute;z-index:950;right:12px;bottom:calc(180px + var(--sb));display:flex;flex-direction:column;gap:12px}
 #clubPill{position:absolute;z-index:900;pointer-events:none;bottom:calc(84px + var(--sb));left:50%;transform:translateX(-50%);
-  background:var(--hud);border:1.5px solid var(--hudline);border-radius:22px;padding:8px 26px;text-align:center;white-space:nowrap;max-width:70vw}
-#clubPill .club{font-size:28px;font-weight:800;color:var(--yellow);line-height:1.05}
+  background:var(--hud);border:1.5px solid var(--hudline);border-radius:22px;padding:8px 30px;text-align:center;white-space:nowrap;max-width:80vw;
+  align-items:center;gap:20px;justify-content:center}
+#clubPill .club{font-size:30px;font-weight:800;color:var(--yellow);line-height:1.05}
 #clubPill .opt{font-size:13px;font-weight:600;color:#e8ecdc}
+#clubPill .altclub{font-size:24px;font-weight:800;color:rgba(255,255,255,.35)}
 #chipRow{position:absolute;z-index:900;bottom:calc(12px + var(--sb));left:10px;right:10px;display:flex;gap:6px;justify-content:center;align-items:stretch}
 .mchip{background:var(--hud);border:1.5px solid var(--hudline);border-radius:16px;padding:6px 13px;color:#fff;font-weight:800;font-size:17px;
   text-align:center;line-height:1.12;font-variant-numeric:tabular-nums;cursor:pointer;display:flex;flex-direction:column;justify-content:center}
@@ -184,12 +186,12 @@ nav button.on .ic{filter:drop-shadow(0 0 6px rgba(217,244,82,.5))}
     <button class="hudBtn" onclick="openLogSheet()" title="Log shot">✏️</button>
     <button class="hudBtn" onclick="openScorecard()" title="Scorecard">🗒</button>
   </div>
-  <div id="clubPill" style="display:none"><div class="club" id="pillClub">—</div><div class="opt" id="pillOpt">optimal</div></div>
+  <div id="clubPill" style="display:none"><div><div class="club" id="pillClub">—</div><div class="opt" id="pillOpt">optimal</div></div><div class="altclub" id="pillAlt"></div></div>
   <div id="chipRow">
     <div class="mchip arrowChip" onclick="navHole(-1)">‹</div>
-    <div class="mchip" onclick="openPuttSheet()"><span id="puttChip">putt</span><small>ft ⌄</small></div>
+    <div class="mchip" onclick="fetchElev(true)"><span id="elevChip">—</span><small>ft elev</small></div>
     <div class="mchip" onclick="cyclePar()"><span class="yellow" id="holeNum">1</span><small id="holePar">PAR 4</small></div>
-    <div class="mchip" onclick="cycleWind()"><span id="windChip">—</span><small>mph wind</small></div>
+    <div class="mchip" onclick="cycleWind()"><span><span id="windArrow" style="display:inline-block">↑</span> <span id="windChip">—</span></span><small>mph</small></div>
     <div class="mchip arrowChip" onclick="navHole(1)">›</div>
   </div>
   <div id="toast"></div>
@@ -281,6 +283,37 @@ function bearing(a,b){
   return(Math.atan2(y,x)*180/Math.PI+360)%360;
 }
 function lerpPoint(a,b,f){return{lat:a.lat+(b.lat-a.lat)*f,lng:a.lng+(b.lng-a.lng)*f};}
+function offsetPt(p,brg,yds){
+  const R=6371000,d=yds/1.09361,r=Math.PI/180;
+  const lat1=p.lat*r,lng1=p.lng*r,b=brg*r;
+  const lat2=Math.asin(Math.sin(lat1)*Math.cos(d/R)+Math.cos(lat1)*Math.sin(d/R)*Math.cos(b));
+  const lng2=lng1+Math.atan2(Math.sin(b)*Math.sin(d/R)*Math.cos(lat1),Math.cos(d/R)-Math.sin(lat1)*Math.sin(lat2));
+  return{lat:lat2/r,lng:lng2/r};
+}
+function buildBuffer(pts,w){
+  if(pts.length<2)return[];
+  const left=[],right=[];
+  for(let i=0;i<pts.length;i++){
+    const a=pts[Math.max(0,i-1)],b=pts[Math.min(pts.length-1,i+1)];
+    const brg=bearing(a,b);
+    left.push(offsetPt(pts[i],brg-90,w));
+    right.push(offsetPt(pts[i],brg+90,w));
+  }
+  return left.concat(right.reverse());
+}
+function slicePolyline(pts,startYd,endYd){
+  const out=[];let acc=0;
+  for(let i=0;i<pts.length-1;i++){
+    const segLen=distYds(pts[i],pts[i+1]);if(segLen<0.5){continue;}
+    const a0=acc,a1=acc+segLen;acc=a1;
+    if(a1<startYd)continue;
+    if(a0>endYd)break;
+    if(!out.length)out.push(lerpPoint(pts[i],pts[i+1],Math.max(0,(startYd-a0))/segLen));
+    out.push(a1<=endYd?pts[i+1]:lerpPoint(pts[i],pts[i+1],(endYd-a0)/segLen));
+  }
+  return out;
+}
+function polylineLen(pts){let t=0;for(let i=0;i<pts.length-1;i++)t+=distYds(pts[i],pts[i+1]);return t;}
 function centroid(pts){
   let lat=0,lng=0,n=0;
   for(let i=0;i<pts.length;i++){
@@ -530,16 +563,19 @@ function resumeRound(){
 function curHole(){return S.active?S.active.holes[S.active.cur]:null;}
 
 /* ================= HOLE SCREEN / MAP ================= */
-let map=null,youMarker=null,teeMarker=null,flagMarker=null,courseLayer=null,aimLayer=null,greenPolys=[];
+let map=null,youMarker=null,teeMarker=null,flagMarker=null,courseLayer=null,holeLayer=null,aimLayer=null,greenPolys=[];
 let POS=null,TEEPOS=null,FLAG=null,AIM=null,GREEN=null,WATCH=null,COURSEDRAWN=false;
 let WINDMODE="auto",WINDMAN=0;
+let ELEV={ft:null},ELEVKEY=null;
 const HSTYLE={
-  rough:{stroke:false,fillColor:"#14330f",fillOpacity:.35,interactive:false},
-  fairway:{color:"#49e05e",weight:2,opacity:.85,fillColor:"#49e05e",fillOpacity:.32,interactive:false},
-  tee:{color:"#ffffff",weight:1.5,opacity:.85,fillColor:"#49e05e",fillOpacity:.4,interactive:false},
-  bunker:{color:"#e8f062",weight:1.5,opacity:.9,fillColor:"#e8f062",fillOpacity:.75,interactive:false},
-  water:{color:"#3fe3d0",weight:1.5,opacity:.9,fillColor:"#2ec9c9",fillOpacity:.55,interactive:false},
-  green:{color:"#c8ff6a",weight:2.5,opacity:1,fillColor:"#6cf584",fillOpacity:.55}
+  rough:{stroke:false,fillColor:"#132e0e",fillOpacity:.30,interactive:false},
+  fairway:{color:"#5ce86f",weight:1.5,opacity:.55,fillColor:"#57dd68",fillOpacity:.34,interactive:false},
+  tee:{color:"#ffffff",weight:1.5,opacity:.85,fillColor:"#57dd68",fillOpacity:.45,interactive:false},
+  bunker:{color:"#3a3320",weight:1.5,opacity:.95,fillColor:"#efe07a",fillOpacity:.92,interactive:false},
+  water:{color:"#3fe3d0",weight:1.5,opacity:.95,fillColor:"#37c4d6",fillOpacity:.6,interactive:false},
+  green:{color:"#d4ff7a",weight:2.5,opacity:1,fillColor:"#74f58a",fillOpacity:.6},
+  corridor:{stroke:false,fillColor:"#2f6b28",fillOpacity:.42,interactive:false},
+  holeFwy:{color:"#7bef86",weight:1.5,opacity:.6,fillColor:"#5fe071",fillOpacity:.46,interactive:false}
 };
 function enterHole(){
   document.getElementById("holeScreen").classList.remove("hidden");
@@ -557,6 +593,7 @@ function initHoleMap(){
   map=L.map("map",{zoomControl:false,attributionControl:false}).setView([39.8,-98.5],4);
   L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:20}).addTo(map);
   courseLayer=L.layerGroup().addTo(map);
+  holeLayer=L.layerGroup().addTo(map);
   aimLayer=L.layerGroup().addTo(map);
   map.on("click",e=>{AIM={lat:e.latlng.lat,lng:e.latlng.lng};recalcHole();});
 }
@@ -580,6 +617,21 @@ function holeGeom(i){
   if(!COURSE||!COURSE.holesSorted.length)return null;
   return COURSE.holesSorted[Math.min(i,COURSE.holesSorted.length-1)]||null;
 }
+function drawHoleCorridor(center){
+  if(!holeLayer)return;
+  holeLayer.clearLayers();
+  if(!center||center.length<2)return;
+  const total=polylineLen(center);
+  if(total<40)return;
+  // shaded hole corridor (rough) — full length, wide
+  const corr=buildBuffer(center,32);
+  if(corr.length)L.polygon(corr.map(p=>[p.lat,p.lng]),HSTYLE.corridor).addTo(holeLayer);
+  // fairway ribbon — starts past the tee, stops short of the green
+  const fwyStart=Math.min(40,total*0.18),fwyEnd=Math.max(fwyStart+20,total-28);
+  const fwyLine=slicePolyline(center,fwyStart,fwyEnd);
+  const fwy=buildBuffer(fwyLine,16);
+  if(fwy.length)L.polygon(fwy.map(p=>[p.lat,p.lng]),HSTYLE.holeFwy).addTo(holeLayer);
+}
 function showHole(i){
   if(!EXPLORE){S.active.cur=i;save();}
   EXPLOREIDX=i;
@@ -591,12 +643,15 @@ function showHole(i){
     let teeEnd=a,g=gb;
     if(ga.d<gb.d){teeEnd=b;g=ga;}
     TEEPOS={lat:teeEnd.lat,lng:teeEnd.lng};
+    const center=(teeEnd===a)?hg.pts:hg.pts.slice().reverse();
+    drawHoleCorridor(center);
     setFlagOnGreen(g.green&&g.d<120?g.green:null,teeEnd===a?b:a);
     map.fitBounds(L.latLngBounds(hg.pts.map(p=>[p.lat,p.lng])).pad(0.35));
     if(!teeMarker)teeMarker=L.marker([teeEnd.lat,teeEnd.lng],{interactive:false,icon:L.divIcon({className:"",html:"<div class='teeDot'></div>",iconAnchor:[8,8]})}).addTo(map);
     else teeMarker.setLatLng([teeEnd.lat,teeEnd.lng]);
-  }else if(map&&COURSE){map.setView([COURSE.center.lat,COURSE.center.lng],16);FLAG=null;GREEN=null;}
+  }else if(map&&COURSE){map.setView([COURSE.center.lat,COURSE.center.lng],16);FLAG=null;GREEN=null;if(holeLayer)holeLayer.clearLayers();}
   updateHoleHud();
+  fetchElev(false);
   recalcHole();
 }
 let EXPLOREIDX=0;
@@ -631,9 +686,6 @@ function updateHoleHud(){
   document.getElementById("holePar").textContent="PAR "+par;
   const hcap=EXPLORE?(hg&&hg.hcap):curHole().hcap;
   document.getElementById("hcap").textContent=hcap?"HCAP "+hcap:"";
-  const h=EXPLORE?null:curHole();
-  const putts=h?h.shots.filter(s=>s.lie==="green").length:0;
-  document.getElementById("puttChip").textContent=putts?putts+" putt"+(putts>1?"s":""):"putt";
 }
 function startGps(){
   if(WATCH!==null||!navigator.geolocation)return;
@@ -681,13 +733,52 @@ function windComponent(from,to){
 function cycleWind(){
   WINDMODE=WINDMODE==="auto"?"off":WINDMODE==="off"?"man":"auto";
   if(WINDMODE==="man")WINDMAN=10;
-  toast(WINDMODE==="auto"?"Wind: live weather":WINDMODE==="off"?"Wind: off":"Wind: manual 10 mph into (tap chip to cycle)");
+  toast(WINDMODE==="auto"?"Wind: live weather":WINDMODE==="off"?"Wind: off":"Wind: manual 10 mph into");
   recalcHole();
+}
+function updateWindChip(p,tgt){
+  const chip=document.getElementById("windChip"),arrow=document.getElementById("windArrow");
+  let mph="—",rot=180,show=true;
+  if(WINDMODE==="off"){mph="off";show=false;}
+  else if(WINDMODE==="man"){mph=WINDMAN;rot=180;} // into = pointing down toward player
+  else if(WEATHER){
+    mph=Math.round(WEATHER.windMph);
+    if(p&&tgt){
+      const travel=(WEATHER.windDeg+180)%360;   // direction wind blows TOWARD
+      rot=(travel-bearing(p,tgt)+360)%360;       // 0 = helping (up), 180 = into (down)
+    }
+  }
+  chip.textContent=mph;
+  arrow.style.opacity=show?"1":"0";
+  arrow.style.transform="rotate("+rot+"deg)";
 }
 function effYds(raw,from,to){
   const w=windComponent(from,to);
   let e=raw*(1+(w>0?0.01*w:0.005*w));
+  if(ELEV.ft!=null)e+=ELEV.ft/3;   // ~1 yd per 3 ft, added 1:1
   return Math.round(e);
+}
+async function fetchElev(force){
+  const p=effPos(),t=FLAG;
+  if(!p||!t){ELEV={ft:null};paintElev();return;}
+  const key=p.lat.toFixed(4)+","+t.lat.toFixed(4)+","+t.lng.toFixed(4);
+  if(!force&&key===ELEVKEY)return;
+  ELEVKEY=key;
+  try{
+    const res=await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${p.lat},${t.lat}&longitude=${p.lng},${t.lng}`);
+    const d=await res.json();
+    if(d&&d.elevation&&d.elevation.length===2){
+      ELEV={ft:(d.elevation[1]-d.elevation[0])*3.28084};
+    }else ELEV={ft:null};
+  }catch(e){ELEV={ft:null};}
+  paintElev();
+  recalcHole();
+}
+function paintElev(){
+  const el=document.getElementById("elevChip");if(!el)return;
+  if(ELEV.ft==null){el.textContent="—";return;}
+  const v=Math.round(ELEV.ft);
+  el.textContent=(Math.abs(v)<2?"0":(v>0?v+" ⌃":Math.abs(v)+" ⌄"));
 }
 function recommend(e){
   const clubs=bagSorted();
@@ -716,12 +807,7 @@ function recalcHole(){
   const fcb=document.getElementById("fcb");
   const pill=document.getElementById("clubPill");
   if(aimLayer)aimLayer.clearLayers();
-  // wind chip
-  let wtxt="—";
-  if(WINDMODE==="off")wtxt="off";
-  else if(WINDMODE==="man")wtxt=WINDMAN;
-  else if(WEATHER)wtxt=Math.round(WEATHER.windMph);
-  document.getElementById("windChip").textContent=wtxt;
+  updateWindChip(p,tgt);
   if(!p||!tgt){fcb.style.display="none";pill.style.display="none";return;}
   const raw=Math.round(distYds(p,tgt));
   // FCB to green
@@ -746,9 +832,12 @@ function recalcHole(){
     layup=planLayup(raw,p,tgt);
     rec={club:layup.club,note:"optimal"};
   }else rec=recommend(e);
-  document.getElementById("pillClub").textContent=rec.club;
+  const idx=clubs.findIndex(c=>c.name===rec.club);
+  const neighbor=idx>=0?(clubs[idx+1]||clubs[idx-1]):null;
+  document.getElementById("pillClub").textContent=shortName(rec.club);
   document.getElementById("pillOpt").textContent=layup?"optimal · leaves "+Math.round(layup.leaves)+" yd":(e!==raw?rec.note+" · plays "+e:rec.note);
-  pill.style.display="block";
+  document.getElementById("pillAlt").textContent=neighbor?shortName(neighbor.name):"";
+  pill.style.display="flex";
   // aim graphics
   if(map){
     if(layup){
@@ -756,13 +845,19 @@ function recalcHole(){
       L.polyline([[layup.pt.lat,layup.pt.lng],[tgt.lat,tgt.lng]],{color:"#fff",weight:2,opacity:.7,dashArray:"6 7"}).addTo(aimLayer);
       chipMarker(lerpPoint(p,layup.pt,0.5),"<div class='distChip'>"+Math.round(layup.carry)+"</div>").addTo(aimLayer);
       chipMarker(lerpPoint(layup.pt,tgt,0.5),"<div class='distChip'>"+Math.round(layup.leaves)+"</div>").addTo(aimLayer);
-      chipMarker(layup.pt,"<div class='suggestChip'><span class='ring'></span><span class='txt'><b>"+esc(rec.club)+"</b><small>optimal</small></span></div>").addTo(aimLayer);
+      chipMarker(layup.pt,"<div class='suggestChip'><span class='ring'></span><span class='txt'><b>"+shortName(rec.club)+"</b><small>optimal</small></span></div>").addTo(aimLayer);
     }else{
       L.polyline([[p.lat,p.lng],[tgt.lat,tgt.lng]],{color:"#fff",weight:2.5,opacity:.95}).addTo(aimLayer);
       chipMarker(lerpPoint(p,tgt,0.5),"<div class='distChip'>"+raw+"</div>").addTo(aimLayer);
-      if(AIM)chipMarker(AIM,"<div class='suggestChip'><span class='ring'></span><span class='txt'><b>"+esc(rec.club)+"</b><small>"+(e!==raw?"plays "+e:rec.note)+"</small></span></div>").addTo(aimLayer);
+      if(AIM)chipMarker(AIM,"<div class='suggestChip'><span class='ring'></span><span class='txt'><b>"+shortName(rec.club)+"</b><small>"+(e!==raw?"plays "+e:rec.note)+"</small></span></div>").addTo(aimLayer);
     }
   }
+}
+function shortName(n){
+  if(/driver/i.test(n))return"Dr";
+  let m=n.match(/(\d)\s*wood/i);if(m)return m[1]+"W";
+  m=n.match(/(\d)\s*hybrid/i);if(m)return m[1]+"H";
+  return n.replace(/\s+/g,"");
 }
 
 /* ================= SHOT LOGGING ================= */
