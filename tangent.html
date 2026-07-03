@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Tangent — Personal Edition</title>
@@ -10,100 +10,205 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 :root{
-  --bg:#0d1117; --card:#161c24; --card2:#1d2530; --line:#2a3442;
-  --txt:#e8edf2; --dim:#8b98a8; --acc:#b4f34d; --accdim:#7aa834;
-  --red:#ff6b6b; --blue:#5ab4ff; --amber:#ffc857;
+  --bg:#0b1f16; --panel:#12291e; --panel2:#1a3a2a; --row:#080d0a; --line:#20452f;
+  --txt:#eef7f0; --dim:#8fae9c; --teal:#41e3bb; --yellow:#d9f452; --red:#ff7a6b; --blue:#5ab4ff;
+  --hud:rgba(8,18,11,.80); --hudline:rgba(217,244,82,.70);
+  --st:env(safe-area-inset-top,0px); --sb:env(safe-area-inset-bottom,0px);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
-body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:15px;overscroll-behavior:none}
+body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:16px;overscroll-behavior:none;user-select:none}
 #app{display:flex;flex-direction:column;height:100dvh}
-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--line);flex:0 0 auto}
-header .logo{font-weight:800;letter-spacing:3px;font-size:17px}
-header .logo b{color:var(--acc)}
-header .sub{color:var(--dim);font-size:11px}
-main{flex:1 1 auto;overflow-y:auto;padding:14px 14px 90px}
-nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:rgba(13,17,23,.97);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
-nav button{flex:1;background:none;border:none;color:var(--dim);font-size:11px;padding:9px 0 7px;cursor:pointer}
-nav button .ic{display:block;font-size:20px;margin-bottom:2px}
-nav button.on{color:var(--acc)}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
-.card h3{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:10px}
-.row{display:flex;gap:8px;align-items:center}
+main{flex:1;overflow-y:auto;padding:calc(14px + var(--st)) 14px 110px}
+h1.title{font-size:34px;font-weight:800;text-align:center;margin:6px 0 14px}
+.card{background:var(--panel);border-radius:20px;padding:16px;margin-bottom:12px}
+.rowcard{background:var(--row);border-radius:18px;padding:16px;margin-bottom:10px;cursor:pointer}
+.row{display:flex;align-items:center;gap:10px}
 .grow{flex:1}
-.btn{background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:10px 14px;font-size:14px;font-weight:600;cursor:pointer}
-.btn.acc{background:var(--acc);color:#10160a;border-color:var(--acc)}
-.btn.sm{padding:6px 10px;font-size:12px;border-radius:8px}
-.btn.ghost{background:none}
-.btn.red{color:var(--red);border-color:#5a2e2e}
+.dim{color:var(--dim)}.teal{color:var(--teal)}.yellow{color:var(--yellow)}.red{color:var(--red)}
+.small{font-size:13px}.mono{font-variant-numeric:tabular-nums}
+.mt{margin-top:10px}.mb{margin-bottom:10px}.center{text-align:center}
+.btn{background:var(--panel2);border:none;color:var(--txt);border-radius:14px;padding:13px 18px;font-size:16px;font-weight:700;cursor:pointer}
+.btn.grad{background:linear-gradient(90deg,var(--teal),var(--yellow));color:#06231a}
+.btn.ghostb{background:var(--panel);color:var(--teal)}
+.btn.sm{padding:8px 12px;font-size:13px;border-radius:10px}
 .btn:active{opacity:.75}
-input,select{background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:10px;font-size:15px;width:100%}
-input[type=number]{-moz-appearance:textfield}
-label.fl{display:block;font-size:11px;color:var(--dim);margin:8px 0 4px;text-transform:uppercase;letter-spacing:.5px}
+input,select,textarea{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:12px;padding:12px;font-size:16px;width:100%}
+label.fl{display:block;font-size:12px;color:var(--dim);margin:10px 0 5px;text-transform:uppercase;letter-spacing:.6px;font-weight:700}
+textarea{font-family:monospace;font-size:12px;min-height:90px}
+/* pills / segmented */
+.pillseg{display:inline-flex;background:#e8ede9;border-radius:999px;padding:3px}
+.pillseg button{border:none;background:none;color:#233;font-size:16px;font-weight:700;padding:8px 22px;border-radius:999px;cursor:pointer}
+.pillseg button.on{background:var(--yellow);color:#122}
+.seg{display:flex;gap:6px}
+.seg button{border:none;background:var(--panel2);color:var(--dim);font-size:14px;font-weight:700;padding:9px 16px;border-radius:999px;cursor:pointer}
+.seg button.on{background:var(--yellow);color:#122}
+.seg button.on.teal{background:var(--teal)}
+.searchbox{display:flex;align-items:center;gap:8px;background:var(--panel);border-radius:14px;padding:0 12px;margin-bottom:12px}
+.searchbox input{background:none;border:none;padding:13px 0}
+.searchbox input:focus{outline:none}
+/* toggle switch */
+.switch{width:52px;height:30px;border-radius:999px;background:var(--panel2);position:relative;cursor:pointer;flex:0 0 auto}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#5a7466;transition:all .15s}
+.switch.on{background:var(--teal)}
+.switch.on::after{left:25px;background:#fff}
+/* stepper */
+.stepper{display:flex;align-items:center;gap:14px}
+.stepper button{width:38px;height:38px;border-radius:50%;border:none;background:var(--panel2);color:var(--txt);font-size:20px;font-weight:800;cursor:pointer}
+.stepper b{font-size:22px;min-width:26px;text-align:center}
+/* config rows */
+.cfg{background:var(--panel);border-radius:20px;overflow:hidden;margin-bottom:12px}
+.cfgrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px;border-bottom:1px solid rgba(255,255,255,.05)}
+.cfgrow:last-child{border-bottom:none}
+.cfgrow .lbl{font-size:17px;font-weight:600}
+.cfgrow .sub{font-size:13px;color:var(--dim);margin-top:2px}
+/* chips */
+.tag{display:inline-block;font-size:14px;font-weight:700;padding:6px 14px;border-radius:999px}
+.tag.teal{background:var(--teal);color:#06231a}
+.tag.yellow{background:var(--yellow);color:#232a06}
+.tag.dark{background:var(--panel2);color:var(--dim)}
+/* nav */
+nav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(10px + var(--sb));z-index:60;
+  display:flex;align-items:center;gap:2px;background:rgba(10,22,15,.92);border:1px solid rgba(255,255,255,.06);
+  border-radius:999px;padding:6px 10px;backdrop-filter:blur(10px)}
+nav button{width:66px;border:none;background:none;color:var(--dim);font-size:11px;font-weight:600;padding:6px 0;cursor:pointer;border-radius:999px}
+nav button .ic{display:block;font-size:21px;margin-bottom:1px}
+nav button.on{color:var(--yellow)}
+nav button.on .ic{filter:drop-shadow(0 0 6px rgba(217,244,82,.5))}
+/* sheets */
+#backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:90}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:100;background:var(--panel);border-radius:22px 22px 0 0;
+  padding:14px 16px calc(22px + var(--sb));max-height:82dvh;overflow-y:auto;max-width:520px;margin:0 auto}
+.grab{width:42px;height:4px;background:var(--line);border-radius:4px;margin:0 auto 12px}
+.hidden{display:none !important}
+/* full screen setup */
+#setup{position:fixed;inset:0;z-index:70;background:var(--bg);overflow-y:auto;padding:calc(14px + var(--st)) 16px calc(30px + var(--sb))}
+#setup .head{display:flex;align-items:center;margin-bottom:14px}
+#setup .head .x{width:44px;height:44px;border-radius:50%;background:var(--panel);border:none;color:var(--txt);font-size:18px;cursor:pointer}
+#setup .head h2{flex:1;text-align:center;font-size:24px;font-weight:800;margin-right:44px}
+.playbar{display:flex;gap:12px;margin-top:16px}
+.playbar .btn{flex:1;padding:16px;font-size:19px;border-radius:16px}
+/* ============ hole screen (map) ============ */
+#holeScreen{position:fixed;inset:0;z-index:80;background:#000}
+#map{position:absolute;inset:0;background:#0b1f16}
+.leaflet-container{background:#0b1f16}
+.hudBtn{width:50px;height:50px;border-radius:16px;background:var(--hud);border:1.5px solid var(--hudline);
+  color:#fff;font-size:21px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+#fcb{position:absolute;z-index:900;pointer-events:none;top:calc(12px + var(--st));left:12px;
+  background:var(--hud);border:1.5px solid var(--hudline);border-radius:18px;padding:7px 15px;text-align:left;line-height:1.12}
+#fcb .bf{color:#fff;font-size:21px;font-weight:700}#fcb .bf .u{font-size:13px;color:#cfd8bf;font-weight:600;margin-left:3px}
+#fcb .c{color:var(--yellow);font-size:36px;font-weight:800}
+#hcap{position:absolute;z-index:900;pointer-events:none;top:calc(120px + var(--st));left:16px;
+  color:#fff;font-size:19px;font-weight:800;text-shadow:0 1px 4px rgba(0,0,0,.9)}
+#closeHole{position:absolute;z-index:950;top:calc(12px + var(--st));right:12px}
+#sideCol{position:absolute;z-index:950;right:12px;bottom:calc(180px + var(--sb));display:flex;flex-direction:column;gap:12px}
+#clubPill{position:absolute;z-index:900;pointer-events:none;bottom:calc(84px + var(--sb));left:50%;transform:translateX(-50%);
+  background:var(--hud);border:1.5px solid var(--hudline);border-radius:22px;padding:8px 26px;text-align:center;white-space:nowrap;max-width:70vw}
+#clubPill .club{font-size:28px;font-weight:800;color:var(--yellow);line-height:1.05}
+#clubPill .opt{font-size:13px;font-weight:600;color:#e8ecdc}
+#chipRow{position:absolute;z-index:900;bottom:calc(12px + var(--sb));left:10px;right:10px;display:flex;gap:6px;justify-content:center;align-items:stretch}
+.mchip{background:var(--hud);border:1.5px solid var(--hudline);border-radius:16px;padding:6px 13px;color:#fff;font-weight:800;font-size:17px;
+  text-align:center;line-height:1.12;font-variant-numeric:tabular-nums;cursor:pointer;display:flex;flex-direction:column;justify-content:center}
+.mchip small{display:block;font-weight:600;font-size:11px;color:#c9d4a3}
+.mchip .yellow{color:var(--yellow)}
+.arrowChip{font-size:20px;padding:6px 16px}
+#toast{position:absolute;z-index:960;pointer-events:none;top:calc(12px + var(--st));left:50%;transform:translateX(-50%);
+  background:var(--hud);border:1.5px solid var(--hudline);border-radius:14px;padding:9px 16px;font-size:14px;font-weight:700;color:#fff;
+  max-width:60vw;text-align:center;transition:opacity .4s;opacity:0}
+/* map markers */
+.youDot{width:16px;height:16px;border-radius:50%;background:#4c9aff;border:3px solid #fff;box-shadow:0 0 8px rgba(0,0,0,.6)}
+.teeDot{width:16px;height:16px;border-radius:50%;background:transparent;border:3.5px solid #fff;box-shadow:0 0 8px rgba(0,0,0,.6)}
+.flagBadge{width:38px;height:38px;border-radius:12px;background:rgba(14,26,10,.6);border:2px solid var(--yellow);color:#fff;font-size:20px;
+  display:flex;align-items:center;justify-content:center;transform:translate(-50%,-50%);box-shadow:0 0 8px rgba(0,0,0,.4)}
+.greenLabel{color:#ffffffd9;font-size:11px;font-weight:800;text-shadow:0 1px 3px rgba(0,0,0,.9);text-align:center;line-height:14px}
+.distChip{display:inline-block;transform:translate(-50%,-50%);background:var(--hud);color:#fff;font-size:16px;font-weight:800;
+  padding:4px 13px;border-radius:14px;border:1.5px solid var(--hudline);white-space:nowrap;font-variant-numeric:tabular-nums}
+.suggestChip{display:inline-flex;align-items:center;gap:8px;transform:translate(-50%,-50%);background:var(--hud);
+  border:1.5px solid var(--hudline);border-radius:18px;padding:6px 15px;white-space:nowrap}
+.suggestChip .ring{width:24px;height:24px;border-radius:50%;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center}
+.suggestChip .ring::after{content:"";width:7px;height:7px;border-radius:50%;background:#fff}
+.suggestChip .txt{text-align:left;line-height:1.05}
+.suggestChip .txt b{color:#fff;font-size:20px;font-weight:800;display:block}
+.suggestChip .txt small{color:#e7efdb;font-size:12px;font-weight:600}
+/* misc lists */
 .chips{display:flex;gap:6px;flex-wrap:wrap}
-.chip{background:var(--card2);border:1px solid var(--line);color:var(--dim);border-radius:999px;padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer}
-.chip.on{background:var(--acc);border-color:var(--acc);color:#10160a}
-.big{font-size:34px;font-weight:800}
-.dim{color:var(--dim)}.acc{color:var(--acc)}.red{color:var(--red)}.blue{color:var(--blue)}
-.mono{font-variant-numeric:tabular-nums}
-.shotlist{margin:8px 0}
-.shot{display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid var(--line);font-size:14px}
+.chip{background:var(--panel2);border:1px solid var(--line);color:var(--dim);border-radius:999px;padding:8px 15px;font-size:14px;font-weight:700;cursor:pointer}
+.chip.on{background:var(--yellow);border-color:var(--yellow);color:#232a06}
+.shot{display:flex;align-items:center;gap:8px;padding:8px 2px;border-bottom:1px solid rgba(255,255,255,.06);font-size:15px}
 .shot .n{width:20px;color:var(--dim);font-weight:700}
-.badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:var(--card2);border:1px solid var(--line);color:var(--dim);text-transform:uppercase}
+.badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;background:var(--panel2);color:var(--dim);text-transform:uppercase}
 .sg{margin-left:auto;font-weight:700;font-size:13px}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-.stat{background:var(--card2);border-radius:10px;padding:10px;text-align:center}
+.stat{background:var(--panel2);border-radius:12px;padding:10px;text-align:center}
 .stat .v{font-size:20px;font-weight:800}
 .stat .l{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
-.sheet{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:100}
-.sheet.open{display:flex;align-items:flex-end}
-.sheet .panel{background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:92dvh;overflow-y:auto;padding:16px 16px calc(20px + env(safe-area-inset-bottom))}
-.sheet .grab{width:40px;height:4px;background:var(--line);border-radius:4px;margin:0 auto 12px}
-#map{height:52dvh;border-radius:12px;background:#000}
 .scoregrid{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;font-size:11px;text-align:center}
 .scoregrid .h{color:var(--dim)}
-.scoregrid .s{background:var(--card2);border-radius:6px;padding:5px 0;font-weight:700}
-.scoregrid .s.birdie{color:var(--acc)}
-.scoregrid .s.bogey{color:var(--amber)}
+.scoregrid .s{background:var(--panel2);border-radius:6px;padding:6px 0;font-weight:700;cursor:pointer}
+.scoregrid .s.birdie{color:var(--teal)}
+.scoregrid .s.bogey{color:var(--yellow)}
 .scoregrid .s.dbl{color:var(--red)}
 .bar{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:13px}
 .bar .l{width:78px;color:var(--dim)}
-.bar .track{flex:1;height:16px;position:relative;background:var(--card2);border-radius:8px;overflow:hidden}
+.bar .track{flex:1;height:16px;position:relative;background:var(--panel2);border-radius:8px;overflow:hidden}
 .bar .fill{position:absolute;top:0;bottom:0}
 .bar .v{width:44px;text-align:right;font-weight:700}
-.center{text-align:center}
-.mt{margin-top:10px}.mb{margin-bottom:10px}
-.small{font-size:12px}
-textarea{background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:10px;width:100%;font-size:12px;font-family:monospace;min-height:90px}
-.coach{background:linear-gradient(135deg,#18240f,#161c24);border:1px solid var(--accdim)}
+.big{font-size:34px;font-weight:800}
 </style>
 </head>
 <body>
 <div id="app">
-<header>
-  <div><div class="logo">TAN<b>G</b>ENT</div><div class="sub">personal edition</div></div>
-  <div id="hdr-right" class="dim small"></div>
-</header>
-<main id="main"></main>
-<nav>
-  <button id="nav-play" onclick="go('play')"><span class="ic">⛳</span>Play</button>
-  <button id="nav-mlm" onclick="go('mlm')"><span class="ic">📡</span>MLM2Pro</button>
-  <button id="nav-stats" onclick="go('stats')"><span class="ic">📈</span>Stats</button>
-  <button id="nav-bag" onclick="go('bag')"><span class="ic">🎒</span>Bag</button>
-</nav>
+  <main id="main"></main>
+  <nav>
+    <button id="nav-golf" onclick="go('golf')"><span class="ic">⛳</span>golf</button>
+    <button id="nav-mlm" onclick="go('mlm')"><span class="ic">📡</span>mlm2pro</button>
+    <button id="nav-stats" onclick="go('stats')"><span class="ic">📈</span>stats</button>
+    <button id="nav-bag" onclick="go('bag')"><span class="ic">🎒</span>bag</button>
+  </nav>
 </div>
 
-<div class="sheet" id="sheet"><div class="panel" id="sheet-body"></div></div>
+<div id="setup" class="hidden"></div>
+
+<div id="holeScreen" class="hidden">
+  <div id="map"></div>
+  <div id="fcb" style="display:none">
+    <div class="bf"><span id="fcbB">—</span><span class="u">b</span></div>
+    <div class="c" id="fcbC">—</div>
+    <div class="bf"><span id="fcbF">—</span><span class="u">f</span></div>
+  </div>
+  <div id="hcap"></div>
+  <button class="hudBtn" id="closeHole" onclick="exitHole()">✕</button>
+  <div id="sideCol">
+    <button class="hudBtn" id="gpsBtn" onclick="startGps()" title="GPS">🧍</button>
+    <button class="hudBtn" onclick="refitHole()" title="Recenter">↻</button>
+    <button class="hudBtn" onclick="openLogSheet()" title="Log shot">✏️</button>
+    <button class="hudBtn" onclick="openScorecard()" title="Scorecard">🗒</button>
+  </div>
+  <div id="clubPill" style="display:none"><div class="club" id="pillClub">—</div><div class="opt" id="pillOpt">optimal</div></div>
+  <div id="chipRow">
+    <div class="mchip arrowChip" onclick="navHole(-1)">‹</div>
+    <div class="mchip" onclick="openPuttSheet()"><span id="puttChip">putt</span><small>ft ⌄</small></div>
+    <div class="mchip" onclick="cyclePar()"><span class="yellow" id="holeNum">1</span><small id="holePar">PAR 4</small></div>
+    <div class="mchip" onclick="cycleWind()"><span id="windChip">—</span><small>mph wind</small></div>
+    <div class="mchip arrowChip" onclick="navHole(1)">›</div>
+  </div>
+  <div id="toast"></div>
+</div>
+
+<div id="backdrop" class="hidden" onclick="closeSheet()"></div>
+<div class="sheet hidden" id="sheet"><div class="grab"></div><div id="sheet-body"></div></div>
 
 <script>
 /* ================= STATE ================= */
 const DEFAULT_BAG=[["Driver",230],["3 Wood",210],["5 Wood",195],["4i",180],["5i",170],["6i",160],["7i",150],["8i",140],["9i",130],["PW",118],["GW",105],["SW",90],["LW",75]];
 let S=load();
-function load(){try{const d=JSON.parse(localStorage.getItem("tangent_v1"));if(d&&d.bag){d.lm=d.lm||{};return d;}}catch(e){}
-  return {bag:DEFAULT_BAG.map(c=>({name:c[0],carry:c[1]})),rounds:[],active:null,lm:{}};}
+function load(){try{const d=JSON.parse(localStorage.getItem("tangent_v1"));if(d&&d.bag){d.lm=d.lm||{};d.favs=d.favs||[];d.hcap=d.hcap===undefined?8:d.hcap;return d;}}catch(e){}
+  return {bag:DEFAULT_BAG.map(c=>({name:c[0],carry:c[1]})),rounds:[],active:null,lm:{},favs:[],hcap:8};}
 function save(){localStorage.setItem("tangent_v1",JSON.stringify(S));}
 function today(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
+function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+let COURSE=null; try{COURSE=JSON.parse(localStorage.getItem("tangent_course"));}catch(e){}
+function saveCourse(){localStorage.setItem("tangent_course",JSON.stringify(COURSE));}
 
 /* ============ STROKES GAINED (Broadie scratch baseline) ============ */
 const TEE=[[100,2.92],[120,2.99],[140,2.97],[160,2.99],[180,3.05],[200,3.12],[220,3.17],[240,3.25],[260,3.45],[280,3.65],[300,3.71],[320,3.79],[340,3.86],[360,3.92],[380,3.96],[400,3.99],[420,4.02],[440,4.08],[460,4.17],[480,4.28],[500,4.41],[520,4.54],[540,4.65],[560,4.74],[580,4.79],[600,4.82]];
@@ -119,12 +224,12 @@ function interp(tbl,x){
   return tbl[tbl.length-1][1];
 }
 function expS(lie,dist,par){
-  if(lie==="green")return interp(GRN,dist);           // dist in feet
+  if(lie==="green")return interp(GRN,dist);
   if(lie==="tee")return par>=4?interp(TEE,dist):interp(FWY,dist);
   if(lie==="fairway")return interp(FWY,dist);
   if(lie==="rough")return interp(RGH,dist);
   if(lie==="sand")return interp(SND,dist);
-  return interp(RCV,dist);                             // recovery
+  return interp(RCV,dist);
 }
 function catOf(s,par){
   if(s.lie==="green")return"putt";
@@ -133,15 +238,13 @@ function catOf(s,par){
   return"app";
 }
 const CATNAMES={drive:"Off the Tee",app:"Approach",short:"Short Game",putt:"Putting"};
-
-function holeCalc(h){
+function holeCalcS(h){
   const sg={drive:0,app:0,short:0,putt:0};let strokes=0;
   h.shots.forEach((s,i)=>{
     const exp=expS(s.lie,s.dist,h.par);
     const nxt=i+1<h.shots.length?expS(h.shots[i+1].lie,h.shots[i+1].dist,h.par):0;
-    const pen=s.pen?1:0;
-    sg[catOf(s,h.par)]+=exp-nxt-1-pen;
-    strokes+=1+pen;
+    sg[catOf(s,h.par)]+=exp-nxt-1-(s.pen?1:0);
+    strokes+=1+(s.pen?1:0);
   });
   return{sg,strokes};
 }
@@ -149,193 +252,408 @@ function roundCalc(r){
   const sg={drive:0,app:0,short:0,putt:0};let score=0,toPar=0,putts=0,gir=0,girN=0,fir=0,firN=0,scr=0,scrN=0;
   r.holes.forEach(h=>{
     if(!h.shots.length)return;
-    const c=holeCalc(h);
+    const c=holeCalcS(h);
     Object.keys(sg).forEach(k=>sg[k]+=c.sg[k]);
     score+=c.strokes;toPar+=c.strokes-h.par;
     putts+=h.shots.filter(s=>s.lie==="green").length;
     const gi=h.shots.findIndex(s=>s.lie==="green");
     girN++;
-    let pensBefore=0;h.shots.slice(0,gi<0?h.shots.length:gi).forEach(s=>{if(s.pen)pensBefore++});
-    const onGreenIn=gi<0?99:gi+pensBefore;
-    const isGir=onGreenIn<=h.par-2;if(isGir)gir++;
+    let pens=0;h.shots.slice(0,gi<0?h.shots.length:gi).forEach(s=>{if(s.pen)pens++});
+    const isGir=(gi<0?99:gi+pens)<=h.par-2;if(isGir)gir++;
     if(h.par>=4){firN++;if(h.shots[1]&&h.shots[1].lie==="fairway")fir++;}
     if(!isGir){scrN++;if(c.strokes<=h.par)scr++;}
   });
   return{sg,score,toPar,putts,gir,girN,fir,firN,scr,scrN};
 }
+function stablePts(strokes,par,alloc){const d=strokes-(par+alloc);return d<=-2?4:d===-1?3:d===0?2:d===1?1:0;}
 
-/* ================= NAV ================= */
-let TAB="play";
+/* ================= GEOMETRY ================= */
+function distYds(a,b){
+  const r=d=>d*Math.PI/180;
+  const dLat=r(b.lat-a.lat),dLng=r(b.lng-a.lng);
+  const s=Math.sin(dLat/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLng/2)**2;
+  return 2*6371000*Math.asin(Math.sqrt(s))*1.09361;
+}
+function bearing(a,b){
+  const r=d=>d*Math.PI/180;
+  const y=Math.sin(r(b.lng-a.lng))*Math.cos(r(b.lat));
+  const x=Math.cos(r(a.lat))*Math.sin(r(b.lat))-Math.sin(r(a.lat))*Math.cos(r(b.lat))*Math.cos(r(b.lng-a.lng));
+  return(Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+function lerpPoint(a,b,f){return{lat:a.lat+(b.lat-a.lat)*f,lng:a.lng+(b.lng-a.lng)*f};}
+function centroid(pts){
+  let lat=0,lng=0,n=0;
+  for(let i=0;i<pts.length;i++){
+    if(i===pts.length-1&&pts[i].lat===pts[0].lat&&pts[i].lng===pts[0].lng)break;
+    lat+=pts[i].lat;lng+=pts[i].lng;n++;
+  }
+  return{lat:lat/n,lng:lng/n};
+}
+
+/* ================= NAV / RENDER ================= */
+let TAB="golf";
 function go(t){TAB=t;document.querySelectorAll("nav button").forEach(b=>b.classList.remove("on"));
   document.getElementById("nav-"+t).classList.add("on");render();}
 function render(){
   const m=document.getElementById("main");
-  if(TAB==="play")m.innerHTML=vPlay();
+  if(TAB==="golf")m.innerHTML=vGolf();
   else if(TAB==="mlm")m.innerHTML=vMlm();
   else if(TAB==="stats")m.innerHTML=vStats();
   else m.innerHTML=vBag();
-  document.getElementById("hdr-right").textContent=S.active?`${S.active.course} · Hole ${S.active.cur+1}`:"";
 }
-function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
-function sheet(html){document.getElementById("sheet-body").innerHTML='<div class="grab"></div>'+html;document.getElementById("sheet").classList.add("open");}
-function closeSheet(){document.getElementById("sheet").classList.remove("open");}
-document.getElementById("sheet").addEventListener("click",e=>{if(e.target.id==="sheet")closeSheet();});
+function sheet(html){document.getElementById("sheet-body").innerHTML=html;
+  document.getElementById("sheet").classList.remove("hidden");document.getElementById("backdrop").classList.remove("hidden");}
+function closeSheet(){document.getElementById("sheet").classList.add("hidden");document.getElementById("backdrop").classList.add("hidden");}
+let toastTimer=null;
+function toast(msg,sticky){const t=document.getElementById("toast");t.textContent=msg;t.style.opacity="1";
+  clearTimeout(toastTimer);if(!sticky)toastTimer=setTimeout(()=>t.style.opacity="0",4000);}
 
-/* ================= PLAY ================= */
-function vPlay(){
-  if(!S.active)return vRoundSetup();
-  const r=S.active,h=r.holes[r.cur];
-  const c=holeCalc(h);
-  const runningScore=r.holes.slice(0,r.cur+1).reduce((a,x)=>a+(x.shots.length?holeCalc(x).strokes:0),0);
-  const runningPar=r.holes.slice(0,r.cur+1).filter(x=>x.shots.length).reduce((a,x)=>a+x.par,0);
-  const tp=runningScore-runningPar;
-  let html=`
-  <div class="card">
-    <div class="row">
-      <button class="btn sm" onclick="navHole(-1)" ${r.cur===0?"disabled":""}>‹</button>
-      <div class="grow center"><div class="big">Hole ${r.cur+1}</div>
-      <div class="dim small">${esc(r.course)} · ${runningScore?`${runningScore} (${tp>0?"+":""}${tp===0?"E":tp})`:"—"}</div></div>
-      <button class="btn sm" onclick="navHole(1)" ${r.cur===r.holes.length-1?"disabled":""}>›</button>
-    </div>
-    <label class="fl">Par</label>
-    <div class="chips">${[3,4,5].map(p=>`<div class="chip ${h.par===p?"on":""}" onclick="setPar(${p})">Par ${p}</div>`).join("")}</div>
-  </div>`;
-
-  // shot list
-  html+=`<div class="card"><h3>Shots · ${c.strokes||0} stroke${c.strokes===1?"":"s"}</h3><div class="shotlist">`;
-  if(!h.shots.length)html+=`<div class="dim small">Log each shot from where the ball lies. First shot = tee.</div>`;
-  h.shots.forEach((s,i)=>{
-    const exp=expS(s.lie,s.dist,h.par);
-    const nxt=i+1<h.shots.length?expS(h.shots[i+1].lie,h.shots[i+1].dist,h.par):(h.done?0:null);
-    const sg=nxt===null?null:exp-nxt-1-(s.pen?1:0);
-    html+=`<div class="shot"><span class="n">${i+1}</span>
-      <span class="badge">${s.lie}</span>
-      <span class="mono">${s.dist}${s.lie==="green"?" ft":" yd"}</span>
-      ${s.club?`<span class="dim small">${esc(s.club)}</span>`:""}
-      ${s.pen?`<span class="badge" style="color:var(--red)">+1 pen</span>`:""}
-      <span class="sg ${sg>0.05?"acc":sg<-0.05?"red":"dim"}">${sg===null?"":((sg>=0?"+":"")+sg.toFixed(2))}</span></div>`;
-  });
-  html+=`</div>
-    <div class="row">
-      ${h.shots.length?`<button class="btn sm ghost" onclick="undoShot()">↩ Undo</button>
-      <button class="btn sm ghost red" onclick="togglePen()">⚠ Penalty</button>`:""}
-    </div></div>`;
-
-  if(!h.done){
-    const isFirst=h.shots.length===0;
-    html+=`<div class="card"><h3>${isFirst?"Tee shot":"Next shot"} — where does the ball lie?</h3>
-      <div class="chips" id="liechips">
-        ${(isFirst?["tee"]:["fairway","rough","sand","recovery","green"]).map((l,i)=>`<div class="chip ${i===0?"on":""}" data-lie="${l}" onclick="pickLie(this)">${l}</div>`).join("")}
-      </div>
-      <label class="fl" id="distlbl">Distance to hole (${isFirst?"yards":"yards"})</label>
-      <div class="row">
-        <input type="number" id="dist" inputmode="decimal" placeholder="0">
-        <button class="btn sm" onclick="openMap()">📍 GPS</button>
-      </div>
-      <label class="fl">Club (optional — teaches the caddie)</label>
-      <select id="club"><option value="">—</option>${S.bag.map(b=>`<option>${esc(b.name)}</option>`).join("")}</select>
-      <div class="row mt">
-        <button class="btn acc grow" onclick="logShot()">Log shot</button>
-        ${h.shots.length?`<button class="btn" onclick="holeOut()">🕳 Holed it</button>`:""}
-      </div>
-      <div id="caddie" class="mt"></div>
-    </div>`;
-  }else{
-    html+=`<div class="card center"><div class="big">${c.strokes}</div><div class="dim">${scoreName(c.strokes,h.par)}</div>
-      <div class="row mt"><button class="btn grow" onclick="reopenHole()">Edit hole</button>
-      <button class="btn acc grow" onclick="nextAfterDone()">${r.cur===r.holes.length-1?"Finish round ✓":"Next hole ›"}</button></div></div>`;
+/* ================= GOLF TAB — course list ================= */
+let NEARBY=[];let LISTMODE="nearby";let LISTPOS=null;
+function vGolf(){
+  let html=`<h1 class="title">Play</h1>
+  <div class="center mb"><span class="pillseg">
+    <button class="${LISTMODE==="favs"?"on":""}" onclick="LISTMODE='favs';render()">Favorites</button>
+    <button class="${LISTMODE==="nearby"?"on":""}" onclick="LISTMODE='nearby';render()">Nearby</button>
+  </span></div>
+  <div class="searchbox"><span>🔍</span><input id="csearch" placeholder="Search courses" value="" onkeydown="if(event.key==='Enter')searchCourses(this.value)"></div>`;
+  if(S.active){
+    const done=S.active.holes.filter(h=>h.done).length;
+    html+=`<div class="rowcard" style="border:1.5px solid var(--teal)" onclick="resumeRound()">
+      <div style="font-size:20px;font-weight:800" class="teal">▶ Resume round</div>
+      <div class="dim">${esc(S.active.course)} · hole ${S.active.cur+1} · ${done} done</div></div>`;
   }
-
-  // scorecard
-  html+=vScorecard(r);
-  html+=`<div class="row"><button class="btn grow acc" onclick="finishRound()">Finish round</button>
-    <button class="btn red" onclick="if(confirm('Discard this round?')){S.active=null;save();render();}">Discard</button></div>`;
+  const list=LISTMODE==="favs"?S.favs:NEARBY;
+  if(LISTMODE==="nearby"&&!NEARBY.length){
+    html+=`<div class="card center"><div style="font-size:36px">📍</div>
+      <b>Find courses near you</b>
+      <div class="dim small mt mb">Uses your GPS to list golf courses nearby (from OpenStreetMap).</div>
+      <button class="btn grad" onclick="findNearby()">Find nearby courses</button></div>`;
+  }
+  if(LISTMODE==="favs"&&!S.favs.length){
+    html+=`<div class="card center dim">No favorites yet — tap ☆ on a course.</div>`;
+  }
+  list.forEach((c,i)=>{
+    const fav=S.favs.some(f=>f.name===c.name);
+    html+=`<div class="rowcard" onclick="openSetup(${LISTMODE==="favs"?"S.favs":"NEARBY"}[${i}])">
+      <div class="row"><div class="grow">
+        <div style="font-size:21px;font-weight:800">${esc(c.name)}</div>
+        <div class="row"><span class="dim grow">${esc(c.city||"")}</span><span class="dim">${c.mi!=null?c.mi.toFixed(1)+" miles away":""}</span></div>
+        <div class="dim">Holes: ${c.holes||18}</div>
+      </div>
+      <button class="btn sm ghostb" style="font-size:20px;background:none" onclick="event.stopPropagation();toggleFav(${LISTMODE==="favs"?"S.favs":"NEARBY"}[${i}])">${fav?"★":"☆"}</button>
+      </div></div>`;
+  });
   return html;
 }
-function scoreName(s,par){const d=s-par;return d<=-2?"Eagle 🦅":d===-1?"Birdie 🐦":d===0?"Par":d===1?"Bogey":d===2?"Double":`+${d}`;}
-function vScorecard(r){
-  const done=r.holes.map(h=>h.shots.length?holeCalc(h).strokes:null);
-  let rows="";
-  for(let g=0;g<r.holes.length;g+=9){
-    const seg=r.holes.slice(g,g+9);
-    rows+=`<div class="scoregrid mt">${seg.map((h,i)=>`<div class="h">${g+i+1}</div>`).join("")}
-    ${seg.map((h,i)=>{const s=done[g+i];const cls=s==null?"":s<h.par?"birdie":s===h.par?"":s===h.par+1?"bogey":"dbl";
-      return`<div class="s ${cls}" onclick="jumpHole(${g+i})">${s==null?"·":s}</div>`;}).join("")}</div>`;
-  }
-  return`<div class="card"><h3>Scorecard</h3>${rows}</div>`;
-}
-function vRoundSetup(){
-  return`<div class="card"><h3>New round</h3>
-    <label class="fl">Course</label><input id="course" placeholder="Course name" value="">
-    <label class="fl">Holes</label>
-    <div class="chips"><div class="chip on" data-h="18" onclick="pick(this)">18</div><div class="chip" data-h="9" onclick="pick(this)">9</div></div>
-    <button class="btn acc mt" style="width:100%" onclick="startRound()">Start round ⛳</button>
-  </div>
-  ${S.rounds.length?`<div class="card"><h3>Recent rounds</h3>${S.rounds.slice(-5).reverse().map(r=>{
-    const c=r.calc;return`<div class="shot"><span class="grow">${esc(r.course)}<br><span class="dim small">${r.date}</span></span>
-    <span class="big" style="font-size:22px">${c.score}</span><span class="dim mono">&nbsp;${c.toPar>0?"+":""}${c.toPar===0?"E":c.toPar}</span></div>`;}).join("")}</div>`:""}`;
-}
-function pick(el){el.parentElement.querySelectorAll(".chip").forEach(c=>c.classList.remove("on"));el.classList.add("on");}
-function pickLie(el){pick(el);const l=el.dataset.lie;
-  document.getElementById("distlbl").textContent=l==="green"?"Distance to hole (feet)":"Distance to hole (yards)";}
-function startRound(){
-  const n=+document.querySelector("[data-h].on").dataset.h;
-  S.active={course:document.getElementById("course").value||"My course",date:today(),
-    holes:Array.from({length:n},()=>({par:4,shots:[],done:false})),cur:0};
+function toggleFav(c){
+  const i=S.favs.findIndex(f=>f.name===c.name);
+  if(i>=0)S.favs.splice(i,1);else S.favs.push({name:c.name,city:c.city||"",lat:c.lat,lng:c.lng,holes:c.holes||18,mi:c.mi});
   save();render();
 }
-function setPar(p){S.active.holes[S.active.cur].par=p;save();render();}
-function navHole(d){S.active.cur=Math.max(0,Math.min(S.active.holes.length-1,S.active.cur+d));save();render();}
-function jumpHole(i){S.active.cur=i;save();render();}
-function curLie(){const el=document.querySelector("#liechips .chip.on");return el?el.dataset.lie:"fairway";}
-function logShot(){
-  const d=parseFloat(document.getElementById("dist").value);
-  if(!(d>0))return alert("Enter distance to the hole first.");
-  const h=S.active.holes[S.active.cur];
-  h.shots.push({lie:h.shots.length===0?"tee":curLie(),dist:d,club:document.getElementById("club").value||null,pen:false});
-  save();render();
+function findNearby(){
+  render();
+  if(!navigator.geolocation)return alert("No GPS available on this device/browser.");
+  navigator.geolocation.getCurrentPosition(p=>{
+    LISTPOS={lat:p.coords.latitude,lng:p.coords.longitude};
+    fetchNearby(LISTPOS);
+  },e=>alert("GPS error: "+e.message+"\n(Needs HTTPS + location permission)"),{enableHighAccuracy:true,timeout:15000});
 }
-function holeOut(){const h=S.active.holes[S.active.cur];h.done=true;save();render();}
-function reopenHole(){S.active.holes[S.active.cur].done=false;save();render();}
-function nextAfterDone(){const r=S.active;if(r.cur===r.holes.length-1)finishRound();else{r.cur++;save();render();}}
-function undoShot(){const h=S.active.holes[S.active.cur];h.shots.pop();h.done=false;save();render();}
-function togglePen(){const h=S.active.holes[S.active.cur];if(h.shots.length){const s=h.shots[h.shots.length-1];s.pen=!s.pen;save();render();}}
-function finishRound(){
-  const r=S.active;
-  const played=r.holes.filter(h=>h.shots.length&&h.done).length;
-  if(!played)return alert("No completed holes yet.");
-  if(!confirm(`Finish round with ${played} completed hole${played===1?"":"s"}?`))return;
-  r.holes=r.holes.filter(h=>h.shots.length&&h.done);
-  r.calc=roundCalc(r);
-  S.rounds.push(r);S.active=null;save();go("stats");
+async function fetchNearby(pos){
+  const q=`[out:json][timeout:25];(way["leisure"="golf_course"](around:25000,${pos.lat},${pos.lng});relation["leisure"="golf_course"](around:25000,${pos.lat},${pos.lng}););out center tags;`;
+  try{
+    const res=await fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:"data="+encodeURIComponent(q)});
+    const data=await res.json();
+    const seen={};NEARBY=[];
+    for(const el of data.elements){
+      const t=el.tags||{};if(!t.name||seen[t.name])continue;seen[t.name]=1;
+      const c=el.center||{lat:el.lat,lon:el.lon};if(!c||!c.lat)continue;
+      NEARBY.push({name:t.name,city:t["addr:city"]||"",lat:c.lat,lng:c.lon,
+        mi:distYds(pos,{lat:c.lat,lng:c.lon})*0.000568182,holes:t.holes?parseInt(t.holes):18});
+    }
+    NEARBY.sort((a,b)=>a.mi-b.mi);
+    render();
+    if(!NEARBY.length)alert("No mapped courses within 15 miles — try search instead.");
+  }catch(e){alert("Course lookup failed ("+e.message+") — try again.");}
+}
+async function searchCourses(qtext){
+  if(!qtext.trim())return;
+  const m=document.getElementById("main");
+  try{
+    let res=await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=8&q="+encodeURIComponent(qtext+(/golf/i.test(qtext)?"":" golf course")));
+    let data=await res.json();
+    NEARBY=data.map(r=>{
+      const parts=r.display_name.split(", ");
+      return{name:parts[0],city:parts[1]||"",lat:+r.lat,lng:+r.lon,
+        mi:LISTPOS?distYds(LISTPOS,{lat:+r.lat,lng:+r.lon})*0.000568182:null,holes:18};
+    });
+    LISTMODE="nearby";render();
+    document.getElementById("csearch").value=qtext;
+  }catch(e){alert("Search failed — try again.");}
 }
 
-/* caddie suggestion (live as you type distance) */
-document.addEventListener("input",e=>{
-  if(e.target.id!=="dist")return;
-  const box=document.getElementById("caddie");if(!box)return;
-  const lie=curLie();const d=parseFloat(e.target.value);
-  if(!(d>0)||lie==="green"){box.innerHTML="";return;}
-  box.innerHTML=caddieHTML(d);
-});
-let WIND=0; // + hurting mph, - helping
-function caddieHTML(d){
-  const adj=Math.round(d*(1+(WIND>0?WIND*0.01:WIND*0.005)));
-  const learned=clubAverages();
-  let best=null,gap=1e9;
-  S.bag.forEach(b=>{
-    const carry=learned[b.name]||b.carry;
-    const g=Math.abs(carry-adj);
-    if(carry>=adj-4&&g<gap){gap=g;best={...b,carry};}
-  });
-  if(!best)S.bag.forEach(b=>{const carry=learned[b.name]||b.carry;const g=Math.abs(carry-adj);if(g<gap){gap=g;best={...b,carry};}});
-  return`<div class="card coach" style="margin:0">
-    <div class="row"><span style="font-size:22px">🤖</span><div class="grow">
-    <b>${esc(best.name)}</b> <span class="dim small">(carries ~${best.carry} yd${learned[best.name]?", learned":""})</span><br>
-    <span class="small dim">Plays like <b class="acc">${adj} yd</b>${WIND?` with ${Math.abs(WIND)} mph ${WIND>0?"hurting":"helping"}`:""}. ${adj>=170?"Aim for the fat side of the green — take trouble out of play.":adj<=100?"Attack the flag — inside 100 your dispersion is tight.":"Favor center of green over the flag."}</span></div></div>
-    <div class="chips mt">${[-10,-5,0,5,10].map(w=>`<div class="chip ${WIND===w?"on":""}" onclick="WIND=${w};document.getElementById('caddie').innerHTML=caddieHTML(${d})">${w===0?"Calm":(w<0?"↓":"↑")+Math.abs(w)}</div>`).join("")}</div>
+/* ================= ROUND SETUP ================= */
+let SETUP={course:null,scoring:"stroke",net:false,start:1,type:"Social",vis:"Public",tee:null};
+let WEATHER=null;
+function openSetup(c){
+  SETUP={course:c,scoring:"stroke",net:false,start:1,type:"Social",vis:"Public",tee:null};
+  renderSetup();
+  document.getElementById("setup").classList.remove("hidden");
+  loadCourse(c);
+  fetchWeather(c);
+}
+function closeSetup(){document.getElementById("setup").classList.add("hidden");}
+function renderSetup(){
+  const c=SETUP.course;
+  const holesN=(COURSE&&COURSE.name===c.name&&COURSE.holesSorted.length)?COURSE.holesSorted.length:(c.holes||18);
+  let parN=null;
+  if(COURSE&&COURSE.name===c.name&&COURSE.holesSorted.length){
+    parN=COURSE.holesSorted.reduce((a,h)=>a+(parseInt(h.par)||4),0);
+  }
+  document.getElementById("setup").innerHTML=`
+  <div class="head"><button class="x" onclick="closeSetup()">✕</button><h2>Round setup</h2></div>
+  <div class="card">
+    <div class="row"><div class="grow">
+      <div style="font-size:23px;font-weight:800">${esc(c.name)}</div>
+      <div class="dim">${esc(c.city||"")}</div></div>
+      ${c.mi!=null?`<span class="tag dark">${c.mi.toFixed(1)} mi</span>`:""}
+    </div>
+    <div class="row mt">
+      <span class="tag teal">${holesN} holes</span>
+      <span class="tag yellow">${parN?"Par "+parN:"Par —"}</span>
+      <span class="dim small grow" id="loadNote">${COURSE&&COURSE.name===c.name?"":"Loading course map…"}</span>
+    </div>
+  </div>
+  <div class="cfg">
+    <div class="cfgrow"><span class="lbl">☀️ Weather</span><span class="dim" id="wx">${WEATHER?Math.round(WEATHER.tempF)+"°F · "+Math.round(WEATHER.windMph)+" mph wind":"…"}</span></div>
+  </div>
+  <label class="fl">Configuration</label>
+  <div class="cfg">
+    <div class="cfgrow"><div><div class="lbl">Round type</div><div class="sub">Just for fun. No pressure.</div></div>
+      <div class="seg">${["Social","Serious"].map(t=>`<button class="teal ${SETUP.type===t?"on teal":""}" onclick="SETUP.type='${t}';renderSetup()">${t}</button>`).join("")}</div></div>
+    <div class="cfgrow"><span class="lbl">Scoring</span>
+      <div class="seg">${["Stroke","Stableford"].map(s=>`<button class="${SETUP.scoring===s.toLowerCase()?"on":""}" onclick="SETUP.scoring='${s.toLowerCase()}';renderSetup()">${s}</button>`).join("")}</div></div>
+    <div class="cfgrow"><span class="lbl">Net scoring</span>
+      <div class="switch ${SETUP.net?"on":""}" onclick="SETUP.net=!SETUP.net;renderSetup()"></div></div>
+    <div class="cfgrow"><span class="lbl">Starting hole</span>
+      <div class="stepper"><button onclick="SETUP.start=Math.max(1,SETUP.start-1);renderSetup()">−</button><b>${SETUP.start}</b><button onclick="SETUP.start=Math.min(${holesN},SETUP.start+1);renderSetup()">+</button></div></div>
+  </div>
+  <div class="playbar">
+    <button class="btn ghostb" onclick="startRound(true)">Game plan</button>
+    <button class="btn grad" onclick="startRound(false)">Play</button>
   </div>`;
 }
+async function fetchWeather(c){
+  try{
+    const res=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${c.lat}&longitude=${c.lng}&current=temperature_2m,wind_speed_10m,wind_direction_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`);
+    const d=await res.json();
+    WEATHER={tempF:d.current.temperature_2m,windMph:d.current.wind_speed_10m,windDeg:d.current.wind_direction_10m};
+    const el=document.getElementById("wx");
+    if(el)el.textContent=Math.round(WEATHER.tempF)+"°F · "+Math.round(WEATHER.windMph)+" mph wind";
+  }catch(e){}
+}
+
+/* ================= COURSE DATA (Overpass) ================= */
+async function loadCourse(c){
+  if(COURSE&&COURSE.name===c.name&&COURSE.greens){if(document.getElementById("loadNote"))document.getElementById("loadNote").textContent="";renderSetup();return;}
+  const q=`[out:json][timeout:25];
+(way["golf"="green"](around:2500,${c.lat},${c.lng});
+ way["golf"="bunker"](around:2500,${c.lat},${c.lng});
+ way["golf"="fairway"](around:2500,${c.lat},${c.lng});
+ way["golf"="tee"](around:2500,${c.lat},${c.lng});
+ way["golf"="hole"](around:2500,${c.lat},${c.lng});
+ way["golf"="water_hazard"](around:2500,${c.lat},${c.lng});
+ way["natural"="water"](around:2500,${c.lat},${c.lng});
+ way["leisure"="golf_course"](around:2500,${c.lat},${c.lng}););
+out geom;`;
+  try{
+    const res=await fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:"data="+encodeURIComponent(q)});
+    const data=await res.json();
+    COURSE={name:c.name,center:{lat:c.lat,lng:c.lng},greens:[],bunkers:[],fairways:[],tees:[],water:[],holes:[],boundary:[],holesSorted:[]};
+    for(const el of data.elements){
+      if(el.type!=="way"||!el.geometry||el.geometry.length<2)continue;
+      const pts=el.geometry.map(g=>({lat:g.lat,lng:g.lon}));
+      const tags=el.tags||{};
+      if(tags.golf==="hole"){COURSE.holes.push({pts,ref:tags.ref||null,par:tags.par||null,hcap:tags.handicap||null});continue;}
+      if(el.geometry.length<3)continue;
+      if(tags.golf==="green")COURSE.greens.push({pts,ref:tags.ref||null});
+      else if(tags.golf==="bunker")COURSE.bunkers.push({pts});
+      else if(tags.golf==="fairway")COURSE.fairways.push({pts});
+      else if(tags.golf==="tee")COURSE.tees.push({pts,ref:tags.ref||null});
+      else if(tags.golf==="water_hazard"||tags.natural==="water")COURSE.water.push({pts});
+      else if(tags.leisure==="golf_course")COURSE.boundary.push({pts});
+    }
+    COURSE.holesSorted=COURSE.holes.filter(h=>h.ref!==null&&!isNaN(parseInt(h.ref))).sort((a,b)=>parseInt(a.ref)-parseInt(b.ref));
+    saveCourse();
+    COURSEDRAWN=false;
+    renderSetup();
+  }catch(e){
+    const el=document.getElementById("loadNote");
+    if(el)el.textContent="Course map unavailable — GPS distances still work.";
+  }
+}
+function nearestGreenTo(pt){
+  let best={green:null,d:Infinity};
+  for(const g of (COURSE&&COURSE.greens)||[]){
+    const d=distYds(pt,centroid(g.pts));
+    if(d<best.d)best={green:g,d};
+  }
+  return best;
+}
+
+/* ================= ROUND ================= */
+let EXPLORE=false;
+function startRound(explore){
+  EXPLORE=explore;
+  const c=SETUP.course;
+  const hs=(COURSE&&COURSE.name===c.name&&COURSE.holesSorted.length)?COURSE.holesSorted:null;
+  const n=hs?hs.length:(c.holes||18);
+  if(!explore){
+    S.active={course:c.name,city:c.city||"",date:today(),scoring:SETUP.scoring,net:SETUP.net,
+      holes:Array.from({length:n},(_,i)=>({par:hs?(parseInt(hs[i].par)||4):4,hcap:hs?(parseInt(hs[i].hcap)||null):null,shots:[],done:false})),
+      cur:SETUP.start-1};
+    save();
+  }
+  closeSetup();
+  enterHole();
+}
+function resumeRound(){
+  EXPLORE=false;
+  if(COURSE&&COURSE.name===S.active.course)enterHole();
+  else{
+    // need geometry again — best effort from favorites/nearby, else map-less
+    const src=S.favs.find(f=>f.name===S.active.course)||NEARBY.find(f=>f.name===S.active.course);
+    if(src){SETUP.course=src;loadCourse(src).then(()=>enterHole());}
+    else enterHole();
+  }
+}
+function curHole(){return S.active?S.active.holes[S.active.cur]:null;}
+
+/* ================= HOLE SCREEN / MAP ================= */
+let map=null,youMarker=null,teeMarker=null,flagMarker=null,courseLayer=null,aimLayer=null,greenPolys=[];
+let POS=null,TEEPOS=null,FLAG=null,AIM=null,GREEN=null,WATCH=null,COURSEDRAWN=false;
+let WINDMODE="auto",WINDMAN=0;
+const HSTYLE={
+  rough:{stroke:false,fillColor:"#14330f",fillOpacity:.35,interactive:false},
+  fairway:{color:"#49e05e",weight:2,opacity:.85,fillColor:"#49e05e",fillOpacity:.32,interactive:false},
+  tee:{color:"#ffffff",weight:1.5,opacity:.85,fillColor:"#49e05e",fillOpacity:.4,interactive:false},
+  bunker:{color:"#e8f062",weight:1.5,opacity:.9,fillColor:"#e8f062",fillOpacity:.75,interactive:false},
+  water:{color:"#3fe3d0",weight:1.5,opacity:.9,fillColor:"#2ec9c9",fillOpacity:.55,interactive:false},
+  green:{color:"#c8ff6a",weight:2.5,opacity:1,fillColor:"#6cf584",fillOpacity:.55}
+};
+function enterHole(){
+  document.getElementById("holeScreen").classList.remove("hidden");
+  if(!map)initHoleMap();
+  drawCourseLayers();
+  showHole(EXPLORE?0:S.active.cur);
+  startGps();
+}
+function exitHole(){
+  document.getElementById("holeScreen").classList.add("hidden");
+  if(WATCH!==null){navigator.geolocation.clearWatch(WATCH);WATCH=null;POS=null;}
+  go("golf");
+}
+function initHoleMap(){
+  map=L.map("map",{zoomControl:false,attributionControl:false}).setView([39.8,-98.5],4);
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:20}).addTo(map);
+  courseLayer=L.layerGroup().addTo(map);
+  aimLayer=L.layerGroup().addTo(map);
+  map.on("click",e=>{AIM={lat:e.latlng.lat,lng:e.latlng.lng};recalcHole();});
+}
+function drawCourseLayers(){
+  if(!COURSE||COURSEDRAWN||!courseLayer)return;
+  courseLayer.clearLayers();greenPolys=[];
+  const draw=(arr,st)=>{for(const f of arr||[])L.polygon(f.pts.map(p=>[p.lat,p.lng]),st).addTo(courseLayer);};
+  draw(COURSE.boundary,HSTYLE.rough);
+  draw(COURSE.fairways,HSTYLE.fairway);
+  draw(COURSE.water,HSTYLE.water);
+  draw(COURSE.bunkers,HSTYLE.bunker);
+  draw(COURSE.tees,HSTYLE.tee);
+  for(const g of COURSE.greens){
+    const poly=L.polygon(g.pts.map(p=>[p.lat,p.lng]),HSTYLE.green).addTo(courseLayer);
+    poly.on("click",e=>{L.DomEvent.stopPropagation(e);setFlagOnGreen(g);});
+    greenPolys.push({g,poly});
+  }
+  COURSEDRAWN=true;
+}
+function holeGeom(i){
+  if(!COURSE||!COURSE.holesSorted.length)return null;
+  return COURSE.holesSorted[Math.min(i,COURSE.holesSorted.length-1)]||null;
+}
+function showHole(i){
+  if(!EXPLORE){S.active.cur=i;save();}
+  EXPLOREIDX=i;
+  AIM=null;
+  const hg=holeGeom(i);
+  if(hg&&map){
+    const a=hg.pts[0],b=hg.pts[hg.pts.length-1];
+    const ga=nearestGreenTo(a),gb=nearestGreenTo(b);
+    let teeEnd=a,g=gb;
+    if(ga.d<gb.d){teeEnd=b;g=ga;}
+    TEEPOS={lat:teeEnd.lat,lng:teeEnd.lng};
+    setFlagOnGreen(g.green&&g.d<120?g.green:null,teeEnd===a?b:a);
+    map.fitBounds(L.latLngBounds(hg.pts.map(p=>[p.lat,p.lng])).pad(0.35));
+    if(!teeMarker)teeMarker=L.marker([teeEnd.lat,teeEnd.lng],{interactive:false,icon:L.divIcon({className:"",html:"<div class='teeDot'></div>",iconAnchor:[8,8]})}).addTo(map);
+    else teeMarker.setLatLng([teeEnd.lat,teeEnd.lng]);
+  }else if(map&&COURSE){map.setView([COURSE.center.lat,COURSE.center.lng],16);FLAG=null;GREEN=null;}
+  updateHoleHud();
+  recalcHole();
+}
+let EXPLOREIDX=0;
+function setFlagOnGreen(g,fallbackPt){
+  GREEN=g||null;
+  const pt=g?centroid(g.pts):fallbackPt;
+  if(!pt)return;
+  FLAG={lat:pt.lat,lng:pt.lng};
+  if(map){
+    if(!flagMarker)flagMarker=L.marker([pt.lat,pt.lng],{interactive:false,icon:L.divIcon({className:"",html:"<div class='flagBadge'>⛳</div>",iconSize:[0,0]})}).addTo(map);
+    else flagMarker.setLatLng([pt.lat,pt.lng]);
+  }
+  recalcHole();
+}
+function refitHole(){const hg=holeGeom(EXPLORE?EXPLOREIDX:S.active.cur);
+  if(hg&&map)map.fitBounds(L.latLngBounds(hg.pts.map(p=>[p.lat,p.lng])).pad(0.35));
+  else if(POS&&map)map.setView([POS.lat,POS.lng],17);}
+function navHole(d){
+  if(EXPLORE){showHole(Math.max(0,EXPLOREIDX+d));return;}
+  const n=S.active.holes.length;
+  showHole(Math.max(0,Math.min(n-1,S.active.cur+d)));
+}
+function cyclePar(){
+  if(EXPLORE)return;
+  const h=curHole();h.par=h.par===3?4:h.par===4?5:3;save();updateHoleHud();
+}
+function updateHoleHud(){
+  const i=EXPLORE?EXPLOREIDX:S.active.cur;
+  const hg=holeGeom(i);
+  document.getElementById("holeNum").textContent=hg&&hg.ref?hg.ref:(i+1);
+  const par=EXPLORE?(hg?parseInt(hg.par)||4:4):curHole().par;
+  document.getElementById("holePar").textContent="PAR "+par;
+  const hcap=EXPLORE?(hg&&hg.hcap):curHole().hcap;
+  document.getElementById("hcap").textContent=hcap?"HCAP "+hcap:"";
+  const h=EXPLORE?null:curHole();
+  const putts=h?h.shots.filter(s=>s.lie==="green").length:0;
+  document.getElementById("puttChip").textContent=putts?putts+" putt"+(putts>1?"s":""):"putt";
+}
+function startGps(){
+  if(WATCH!==null||!navigator.geolocation)return;
+  document.getElementById("gpsBtn").textContent="…";
+  WATCH=navigator.geolocation.watchPosition(p=>{
+    const first=!POS;
+    POS={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};
+    document.getElementById("gpsBtn").textContent="🧍";
+    document.getElementById("gpsBtn").style.borderColor="var(--teal)";
+    if(map){
+      if(!youMarker)youMarker=L.marker([POS.lat,POS.lng],{interactive:false,icon:L.divIcon({className:"",html:"<div class='youDot'></div>",iconAnchor:[8,8]})}).addTo(map);
+      else youMarker.setLatLng([POS.lat,POS.lng]);
+    }
+    if(first&&!COURSE)map.setView([POS.lat,POS.lng],17);
+    recalcHole();
+  },e=>{document.getElementById("gpsBtn").textContent="🚫";WATCH=null;
+    toast("GPS blocked — tap the map to aim, distances from tee");},
+  {enableHighAccuracy:true,maximumAge:2000,timeout:20000});
+}
+function effPos(){return POS||TEEPOS;}
 function clubAverages(){
   const acc={};
   const scan=r=>r.holes.forEach(h=>h.shots.forEach((s,i)=>{
@@ -349,51 +667,214 @@ function clubAverages(){
   const out={};Object.keys(acc).forEach(k=>{if(acc[k].length>=3)out[k]=Math.round(acc[k].reduce((a,b)=>a+b)/acc[k].length);});
   return out;
 }
+function bagSorted(){
+  const learned=clubAverages();
+  return S.bag.map(b=>({name:b.name,carry:learned[b.name]||b.carry})).sort((a,b)=>b.carry-a.carry);
+}
+function windComponent(from,to){
+  if(WINDMODE==="off")return 0;
+  if(WINDMODE==="man")return WINDMAN;
+  if(!WEATHER)return 0;
+  const brg=bearing(from,to);
+  return WEATHER.windMph*Math.cos((brg-WEATHER.windDeg)*Math.PI/180); // + into, − helping
+}
+function cycleWind(){
+  WINDMODE=WINDMODE==="auto"?"off":WINDMODE==="off"?"man":"auto";
+  if(WINDMODE==="man")WINDMAN=10;
+  toast(WINDMODE==="auto"?"Wind: live weather":WINDMODE==="off"?"Wind: off":"Wind: manual 10 mph into (tap chip to cycle)");
+  recalcHole();
+}
+function effYds(raw,from,to){
+  const w=windComponent(from,to);
+  let e=raw*(1+(w>0?0.01*w:0.005*w));
+  return Math.round(e);
+}
+function recommend(e){
+  const clubs=bagSorted();
+  const longest=clubs[0],shortest=clubs[clubs.length-1];
+  if(e>longest.carry+5)return{club:longest.name,note:"max out"};
+  if(e<shortest.carry-15)return{club:shortest.name,note:"partial"};
+  let over=null,under=null;
+  for(const c of clubs){if(c.carry>=e)over=c;else{under=c;break;}}
+  if(!over)over=longest;
+  if(over.carry-e<=4)return{club:over.name,note:"full swing"};
+  if(under&&e-under.carry<=4)return{club:under.name,note:"smooth full"};
+  return{club:over.name,note:"swing easy"};
+}
+function planLayup(rawDist,p,tgt){
+  const clubs=bagSorted();
+  let choice=clubs[0];
+  for(const c of clubs){if(rawDist-c.carry>=40){choice=c;break;}}
+  const carry=Math.min(choice.carry,rawDist-10);
+  return{club:choice.name,carry,leaves:rawDist-carry,pt:lerpPoint(p,tgt,carry/rawDist)};
+}
+function chipMarker(pt,html){return L.marker([pt.lat,pt.lng],{interactive:false,icon:L.divIcon({className:"",html,iconSize:[0,0]})});}
+function recalcHole(){
+  if(document.getElementById("holeScreen").classList.contains("hidden"))return;
+  const p=effPos();
+  const tgt=AIM||FLAG;
+  const fcb=document.getElementById("fcb");
+  const pill=document.getElementById("clubPill");
+  if(aimLayer)aimLayer.clearLayers();
+  // wind chip
+  let wtxt="—";
+  if(WINDMODE==="off")wtxt="off";
+  else if(WINDMODE==="man")wtxt=WINDMAN;
+  else if(WEATHER)wtxt=Math.round(WEATHER.windMph);
+  document.getElementById("windChip").textContent=wtxt;
+  if(!p||!tgt){fcb.style.display="none";pill.style.display="none";return;}
+  const raw=Math.round(distYds(p,tgt));
+  // FCB to green
+  if(GREEN&&FLAG){
+    let f=Infinity,b=0;
+    for(const gp of GREEN.pts){const d=distYds(p,gp);if(d<f)f=d;if(d>b)b=d;}
+    document.getElementById("fcbF").textContent=Math.round(f);
+    document.getElementById("fcbC").textContent=Math.round(distYds(p,FLAG));
+    document.getElementById("fcbB").textContent=Math.round(b);
+    fcb.style.display="block";
+  }else if(FLAG){
+    document.getElementById("fcbF").textContent="—";
+    document.getElementById("fcbC").textContent=Math.round(distYds(p,FLAG));
+    document.getElementById("fcbB").textContent="—";
+    fcb.style.display="block";
+  }else fcb.style.display="none";
+  // club / layup
+  const e=effYds(raw,p,tgt);
+  const clubs=bagSorted();
+  let layup=null,rec;
+  if(e>clubs[0].carry+5&&raw>clubs[0].carry){
+    layup=planLayup(raw,p,tgt);
+    rec={club:layup.club,note:"optimal"};
+  }else rec=recommend(e);
+  document.getElementById("pillClub").textContent=rec.club;
+  document.getElementById("pillOpt").textContent=layup?"optimal · leaves "+Math.round(layup.leaves)+" yd":(e!==raw?rec.note+" · plays "+e:rec.note);
+  pill.style.display="block";
+  // aim graphics
+  if(map){
+    if(layup){
+      L.polyline([[p.lat,p.lng],[layup.pt.lat,layup.pt.lng]],{color:"#fff",weight:2.5,opacity:.95}).addTo(aimLayer);
+      L.polyline([[layup.pt.lat,layup.pt.lng],[tgt.lat,tgt.lng]],{color:"#fff",weight:2,opacity:.7,dashArray:"6 7"}).addTo(aimLayer);
+      chipMarker(lerpPoint(p,layup.pt,0.5),"<div class='distChip'>"+Math.round(layup.carry)+"</div>").addTo(aimLayer);
+      chipMarker(lerpPoint(layup.pt,tgt,0.5),"<div class='distChip'>"+Math.round(layup.leaves)+"</div>").addTo(aimLayer);
+      chipMarker(layup.pt,"<div class='suggestChip'><span class='ring'></span><span class='txt'><b>"+esc(rec.club)+"</b><small>optimal</small></span></div>").addTo(aimLayer);
+    }else{
+      L.polyline([[p.lat,p.lng],[tgt.lat,tgt.lng]],{color:"#fff",weight:2.5,opacity:.95}).addTo(aimLayer);
+      chipMarker(lerpPoint(p,tgt,0.5),"<div class='distChip'>"+raw+"</div>").addTo(aimLayer);
+      if(AIM)chipMarker(AIM,"<div class='suggestChip'><span class='ring'></span><span class='txt'><b>"+esc(rec.club)+"</b><small>"+(e!==raw?"plays "+e:rec.note)+"</small></span></div>").addTo(aimLayer);
+    }
+  }
+}
 
-/* ================= MAP / GPS ================= */
-let MAP=null,PIN=null,ME=null,WATCH=null;
-function openMap(){
-  sheet(`<h3 style="margin-bottom:8px">Tap the flag position, stand at your ball</h3>
-    <div id="map"></div>
-    <div class="row mt">
-      <div class="stat grow"><div class="v" id="gpsdist">—</div><div class="l">yards to pin</div></div>
-      <button class="btn acc" onclick="useGps()">Use distance</button>
-    </div>
-    <div class="dim small mt" id="gpsmsg">Waiting for GPS…</div>`);
-  setTimeout(initMap,50);
+/* ================= SHOT LOGGING ================= */
+function openLogSheet(presetLie){
+  if(EXPLORE){toast("Game plan mode — start the round to log shots");return;}
+  const h=curHole();
+  const isFirst=h.shots.length===0;
+  const lie=presetLie||(isFirst?"tee":"fairway");
+  const p=effPos();
+  const distToFlag=p&&FLAG?Math.round(distYds(p,FLAG)):"";
+  const clubs=bagSorted();
+  const e=distToFlag?effYds(distToFlag,p,FLAG):null;
+  const recClub=e?recommend(e).club:"";
+  sheet(`
+  <h2 style="font-size:19px;margin-bottom:4px">${isFirst?"Tee shot":"Shot "+(h.shots.length+1)} — hole ${S.active.cur+1}</h2>
+  <div class="dim small mb">Log where the ball LIES before you hit.</div>
+  <div class="chips" id="liechips">
+    ${(isFirst?["tee"]:["fairway","rough","sand","recovery","green"]).map((l,i)=>`<div class="chip ${l===lie?"on":""}" data-lie="${l}" onclick="pickLie(this)">${l}</div>`).join("")}
+  </div>
+  <label class="fl" id="distlbl">Distance to hole (${lie==="green"?"feet":"yards"})</label>
+  <input type="number" id="dist" inputmode="decimal" value="${lie==="green"?"":distToFlag}" placeholder="0">
+  <label class="fl">Club</label>
+  <select id="club"><option value="">—</option>${S.bag.map(b=>`<option ${b.name===recClub?"selected":""}>${esc(b.name)}</option>`).join("")}</select>
+  <div class="row mt">
+    <button class="btn grad grow" onclick="logShot()">Log shot</button>
+    ${h.shots.length?`<button class="btn" onclick="holedIt()">🕳 Holed</button>`:""}
+  </div>
+  <div class="row mt">
+    ${h.shots.length?`<button class="btn sm" onclick="undoShot()">↩ Undo last</button>
+    <button class="btn sm" style="color:var(--red)" onclick="togglePen()">⚠ Penalty on last</button>`:""}
+    <span class="grow"></span><span class="dim small">${h.shots.length} logged</span>
+  </div>`);
 }
-function initMap(){
-  if(typeof L==="undefined"){document.getElementById("gpsmsg").textContent="Map library failed to load (offline?). Enter distance manually.";return;}
-  MAP=L.map("map",{zoomControl:false}).setView([39.5,-98.35],4);
-  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:20}).addTo(MAP);
-  MAP.on("click",e=>{
-    if(PIN)PIN.setLatLng(e.latlng);else PIN=L.marker(e.latlng).addTo(MAP);
-    updGps();
-  });
-  if(WATCH)navigator.geolocation.clearWatch(WATCH);
-  WATCH=navigator.geolocation.watchPosition(p=>{
-    const ll=[p.coords.latitude,p.coords.longitude];
-    if(!ME){ME=L.circleMarker(ll,{radius:7,color:"#5ab4ff",fillColor:"#5ab4ff",fillOpacity:.9}).addTo(MAP);MAP.setView(ll,17);}
-    else ME.setLatLng(ll);
-    document.getElementById("gpsmsg").textContent=`GPS accuracy ±${Math.round(p.coords.accuracy)} m`;
-    updGps();
-  },e=>{document.getElementById("gpsmsg").textContent="GPS error: "+e.message+" (HTTPS + location permission required)";},{enableHighAccuracy:true});
+function pickLie(el){
+  el.parentElement.querySelectorAll(".chip").forEach(c=>c.classList.remove("on"));el.classList.add("on");
+  document.getElementById("distlbl").textContent=el.dataset.lie==="green"?"Distance to hole (feet)":"Distance to hole (yards)";
 }
-function updGps(){
-  if(!PIN||!ME)return;
-  const a=ME.getLatLng(),b=PIN.getLatLng();
-  const yd=Math.round(hav(a.lat,a.lng,b.lat,b.lng)*1.09361);
-  document.getElementById("gpsdist").textContent=yd;
+function openPuttSheet(){
+  if(EXPLORE){toast("Game plan mode");return;}
+  openLogSheet("green");
 }
-function hav(a1,o1,a2,o2){const R=6371000,r=Math.PI/180;
-  const dA=(a2-a1)*r,dO=(o2-o1)*r;
-  const h=Math.sin(dA/2)**2+Math.cos(a1*r)*Math.cos(a2*r)*Math.sin(dO/2)**2;
-  return 2*R*Math.asin(Math.sqrt(h));}
-function useGps(){
-  const v=document.getElementById("gpsdist").textContent;
-  if(v!=="—"&&document.getElementById("dist")){document.getElementById("dist").value=v;
-    document.getElementById("dist").dispatchEvent(new Event("input",{bubbles:true}));}
+function logShot(){
+  const d=parseFloat(document.getElementById("dist").value);
+  if(!(d>0))return alert("Enter the distance first.");
+  const h=curHole();
+  const lieEl=document.querySelector("#liechips .chip.on");
+  h.shots.push({lie:h.shots.length===0?"tee":(lieEl?lieEl.dataset.lie:"fairway"),dist:d,club:document.getElementById("club").value||null,pen:false});
+  save();closeSheet();updateHoleHud();
+  toast("Shot "+h.shots.length+" logged");
+}
+function holedIt(){
+  const h=curHole();h.done=true;save();closeSheet();
+  const c=holeCalcS(h);
+  toast(scoreName(c.strokes,h.par)+" — "+c.strokes,false);
+  updateHoleHud();
+  const n=S.active.holes.length;
+  if(S.active.cur<n-1)setTimeout(()=>showHole(S.active.cur+1),900);
+  else setTimeout(openScorecard,900);
+}
+function undoShot(){const h=curHole();h.shots.pop();h.done=false;save();closeSheet();updateHoleHud();}
+function togglePen(){const h=curHole();if(h.shots.length){const s=h.shots[h.shots.length-1];s.pen=!s.pen;save();toast(s.pen?"Penalty added":"Penalty removed");}closeSheet();}
+function scoreName(s,par){const d=s-par;return d<=-2?"Eagle 🦅":d===-1?"Birdie 🐦":d===0?"Par":d===1?"Bogey":d===2?"Double":"+"+d;}
+
+/* ================= SCORECARD ================= */
+function allocFor(h,i){
+  if(!S.active.net)return 0;
+  const hc=S.hcap||0,n=S.active.holes.length;
+  const base=Math.floor(hc/n),rem=hc%n;
+  const idx=h.hcap?parseInt(h.hcap):i+1;
+  return base+(idx<=rem?1:0);
+}
+function openScorecard(){
+  const r=S.active;
+  const done=r.holes.map(h=>h.shots.length&&h.done?holeCalcS(h).strokes:null);
+  let rows="";
+  for(let g=0;g<r.holes.length;g+=9){
+    const seg=r.holes.slice(g,g+9);
+    rows+=`<div class="scoregrid mt">${seg.map((h,i)=>`<div class="h">${g+i+1}</div>`).join("")}
+    ${seg.map((h,i)=>{const s=done[g+i];const cls=s==null?"":s<h.par?"birdie":s===h.par?"":s===h.par+1?"bogey":"dbl";
+      return`<div class="s ${cls}" onclick="closeSheet();showHole(${g+i})">${s==null?"·":s}</div>`;}).join("")}</div>`;
+  }
+  const played=r.holes.filter((h,i)=>done[i]!=null);
+  const score=done.reduce((a,b)=>a+(b||0),0);
+  const toPar=played.reduce((a,h,j)=>a+0,0);
+  let tp=0,pts=0;
+  r.holes.forEach((h,i)=>{if(done[i]!=null){tp+=done[i]-h.par;pts+=stablePts(done[i],h.par,allocFor(h,i));}});
+  sheet(`
+  <h2 style="font-size:19px">${esc(r.course)}</h2>
+  <div class="dim small mb">${r.date} · ${r.scoring}${r.net?" · net (HCAP "+S.hcap+")":""}</div>
+  ${rows}
+  <div class="grid3 mt">
+    <div class="stat"><div class="v">${score||"—"}</div><div class="l">Total</div></div>
+    <div class="stat"><div class="v">${played.length?(tp>0?"+":"")+(tp===0?"E":tp):"—"}</div><div class="l">To par</div></div>
+    <div class="stat"><div class="v">${r.scoring==="stableford"?pts:played.length}</div><div class="l">${r.scoring==="stableford"?"Points":"Holes done"}</div></div>
+  </div>
+  <div class="row mt">
+    <button class="btn grad grow" onclick="finishRound()">Finish round</button>
+    <button class="btn" style="color:var(--red)" onclick="if(confirm('Discard this round?')){S.active=null;save();closeSheet();exitHole();}">Discard</button>
+  </div>`);
+}
+function finishRound(){
+  const r=S.active;
+  const played=r.holes.filter(h=>h.shots.length&&h.done).length;
+  if(!played)return alert("No completed holes yet.");
+  if(!confirm(`Finish round with ${played} completed hole${played===1?"":"s"}?`))return;
+  r.holes=r.holes.filter(h=>h.shots.length&&h.done);
+  r.calc=roundCalc(r);
+  S.rounds.push(r);S.active=null;save();
   closeSheet();
+  document.getElementById("holeScreen").classList.add("hidden");
+  if(WATCH!==null){navigator.geolocation.clearWatch(WATCH);WATCH=null;POS=null;}
+  go("stats");
 }
 
 /* ================= MLM2PRO DATA ================= */
@@ -474,70 +955,64 @@ function lmApply(){
 }
 function vMlm(){
   const st=lmStats();const keys=Object.keys(st).sort((a,b)=>st[b].avg-st[a].avg);
-  return`
-  <div class="card coach"><h3 style="color:var(--acc)">📡 MLM2Pro data</h3>
-    <div class="small">Feed in your Rapsodo numbers and the caddie recommends clubs off your <b>real carry distances</b> instead of guesses. Import a session CSV, or key shots in manually.</div></div>
-  <div class="card"><h3>Import session CSV</h3>
-    <input type="file" accept=".csv,text/csv" onchange="lmFile(this)">
+  return`<h1 class="title">MLM2Pro</h1>
+  <div class="card" style="border:1px solid var(--line)"><h3 class="teal" style="font-size:14px;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">📡 Your real numbers</h3>
+    <div class="small dim">Feed in your Rapsodo data and the on-course caddie recommends clubs off your <b style="color:var(--txt)">real carry distances</b> instead of guesses.</div></div>
+  <div class="card"><b>Import session CSV</b>
+    <input type="file" accept=".csv,text/csv" onchange="lmFile(this)" class="mt">
     <label class="fl">…or paste the CSV text here</label>
     <textarea id="lmcsv" placeholder="Club,Carry Distance,...&#10;7 Iron,148,..."></textarea>
-    <button class="btn acc mt" style="width:100%" onclick="lmPaste()">Import pasted CSV</button>
-    <div class="dim small mt">In the Rapsodo app or my.rapsodo.com: open a session → Export / Share → CSV. Any file with a Club column and a Carry column works.</div>
+    <button class="btn grad mt" style="width:100%" onclick="lmPaste()">Import pasted CSV</button>
+    <div class="dim small mt">In the Rapsodo app or my.rapsodo.com: open a session → Export / Share → CSV.</div>
   </div>
-  <div class="card"><h3>Manual entry</h3>
-    <div class="row">
+  <div class="card"><b>Manual entry</b>
+    <div class="row mt">
       <select id="lmclub" style="flex:2">${S.bag.map(b=>`<option>${esc(b.name)}</option>`).join("")}</select>
       <input type="number" id="lmcarry" inputmode="decimal" placeholder="carry yd" style="flex:1">
-      <button class="btn acc" onclick="lmManual()">Add</button>
+      <button class="btn" onclick="lmManual()">Add</button>
     </div>
     <div class="dim small mt">Hit a shot on the MLM2Pro, read the carry off the screen, add it here.</div>
   </div>
-  ${keys.length?`<div class="card"><h3>Your numbers · ${Object.values(st).reduce((a,x)=>a+x.n,0)} shots</h3>
+  ${keys.length?`<div class="card"><b>Your numbers · ${Object.values(st).reduce((a,x)=>a+x.n,0)} shots</b>
     ${keys.map(k=>`<div class="shot"><b style="width:70px">${esc(k)}</b>
       <span class="dim small">${st[k].n} shot${st[k].n===1?"":"s"}</span>
-      <span class="sg mono dim">avg <b class="acc">${st[k].avg}</b> · max ${st[k].max}</span>
-      <button class="btn sm ghost red" onclick="lmClear('${esc(k)}')">✕</button></div>`).join("")}
-    <button class="btn acc mt" style="width:100%" onclick="lmApply()">Apply averages to my bag</button>
+      <span class="sg mono dim">avg <b class="teal">${st[k].avg}</b> · max ${st[k].max}</span>
+      <button class="btn sm" style="color:var(--red);background:none" onclick="lmClear('${esc(k)}')">✕</button></div>`).join("")}
+    <button class="btn grad mt" style="width:100%" onclick="lmApply()">Apply averages to my bag</button>
     <div class="dim small mt">The caddie already blends these shots into its picks (3+ shots per club). Applying also overwrites the carry numbers shown in your Bag.</div>
   </div>`:""}`;
 }
 
 /* ================= STATS ================= */
 function vStats(){
-  if(!S.rounds.length)return`<div class="card center"><div style="font-size:40px">📈</div>
-    <b>No rounds yet</b><div class="dim small mt">Track a round in Play and your Strokes Gained report lands here.</div></div>`;
+  if(!S.rounds.length)return`<h1 class="title">Stats</h1><div class="card center"><div style="font-size:40px">📈</div>
+    <b>No rounds yet</b><div class="dim small mt">Play a tracked round and your Strokes Gained report lands here.</div></div>`;
   const last=S.rounds[S.rounds.length-1],c=last.calc;
   const rs=S.rounds.slice(-20);
   const avg={drive:0,app:0,short:0,putt:0};
   rs.forEach(r=>Object.keys(avg).forEach(k=>avg[k]+=r.calc.sg[k]/rs.length));
   const total=+Object.values(c.sg).reduce((a,b)=>a+b,0).toFixed(1)||0;
-  let html=`<div class="card">
-    <h3>Latest round — ${esc(last.course)} · ${last.date}</h3>
-    <div class="row"><div class="grow center"><div class="big">${c.score}</div><div class="dim small">${c.toPar>0?"+":""}${c.toPar===0?"E":c.toPar} · ${last.holes.length} holes</div></div>
-    <div class="grow center"><div class="big ${total>=0?"acc":"red"}">${total>=0?"+":""}${total.toFixed(1)}</div><div class="dim small">SG vs scratch</div></div></div>
+  let html=`<h1 class="title">Stats</h1><div class="card">
+    <b>Latest — ${esc(last.course)} · ${last.date}</b>
+    <div class="row mt"><div class="grow center"><div class="big">${c.score}</div><div class="dim small">${c.toPar>0?"+":""}${c.toPar===0?"E":c.toPar} · ${last.holes.length} holes</div></div>
+    <div class="grow center"><div class="big ${total>=0?"teal":"red"}">${total>=0?"+":""}${total.toFixed(1)}</div><div class="dim small">SG vs scratch</div></div></div>
     <div class="mt">${sgBars(c.sg)}</div>
     <div class="grid3 mt">
       <div class="stat"><div class="v">${c.putts}</div><div class="l">Putts</div></div>
       <div class="stat"><div class="v">${c.girN?Math.round(c.gir/c.girN*100):0}%</div><div class="l">GIR</div></div>
       <div class="stat"><div class="v">${c.firN?Math.round(c.fir/c.firN*100):0}%</div><div class="l">FIR</div></div>
     </div>
-    ${c.scrN?`<div class="grid3 mt"><div class="stat"><div class="v">${Math.round(c.scr/c.scrN*100)}%</div><div class="l">Scrambling</div></div></div>`:""}
   </div>`;
-  // Tangent Four spider
-  html+=`<div class="card"><h3>Tangent Four — last ${rs.length} round${rs.length===1?"":"s"}</h3>
-    <div class="center">${spider(avg)}</div>
-    <div class="dim small center">Strokes gained per round vs scratch. Outer edge = +1.5, center = −3.</div></div>`;
-  // trend
-  if(S.rounds.length>=2){
-    html+=`<div class="card"><h3>Score trend</h3>${trend(S.rounds.map(r=>r.calc.score))}</div>`;
-  }
-  // approach & putting drilldown
+  html+=`<div class="card"><b>Tangent Four — last ${rs.length} round${rs.length===1?"":"s"}</b>
+    <div class="center mt">${spider(avg)}</div>
+    <div class="dim small center">Strokes gained per round vs scratch.</div></div>`;
+  if(S.rounds.length>=2)html+=`<div class="card"><b>Score trend</b><div class="mt">${trend(S.rounds.map(r=>r.calc.score))}</div></div>`;
   html+=drilldowns();
-  html+=`<div class="card"><h3>Rounds</h3>${S.rounds.slice().reverse().map((r,ri)=>{
+  html+=`<div class="card"><b>Rounds</b>${S.rounds.slice().reverse().map((r,ri)=>{
     const i=S.rounds.length-1-ri;
     return`<div class="shot"><span class="grow">${esc(r.course)}<br><span class="dim small">${r.date} · ${r.holes.length} holes</span></span>
       <span class="mono"><b>${r.calc.score}</b> <span class="dim">(${r.calc.toPar>0?"+":""}${r.calc.toPar===0?"E":r.calc.toPar})</span></span>
-      <button class="btn sm ghost red" onclick="if(confirm('Delete this round?')){S.rounds.splice(${i},1);save();render();}">✕</button></div>`;}).join("")}</div>`;
+      <button class="btn sm" style="color:var(--red);background:none" onclick="if(confirm('Delete this round?')){S.rounds.splice(${i},1);save();render();}">✕</button></div>`;}).join("")}</div>`;
   return html;
 }
 function sgBars(sg){
@@ -546,8 +1021,8 @@ function sgBars(sg){
     const v=sg[k],pct=Math.min(1,Math.abs(v)/max)*50;
     return`<div class="bar"><span class="l">${CATNAMES[k]}</span>
       <div class="track"><div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line)"></div>
-      <div class="fill" style="${v>=0?`left:50%;`:`right:50%;`}width:${pct}%;background:${v>=0?"var(--acc)":"var(--red)"}"></div></div>
-      <span class="v ${v>=0?"acc":"red"}">${v>=0?"+":""}${v.toFixed(1)}</span></div>`;
+      <div class="fill" style="${v>=0?`left:50%;`:`right:50%;`}width:${pct}%;background:${v>=0?"var(--teal)":"var(--red)"}"></div></div>
+      <span class="v ${v>=0?"teal":"red"}">${v>=0?"+":""}${v.toFixed(1)}</span></div>`;
   }).join("");
 }
 function spider(avg){
@@ -561,8 +1036,8 @@ function spider(avg){
   const labels=[["Tee",C,16,"middle"],["App",W-4,C+4,"end"],["Short",C,W-6,"middle"],["Putt",4,C+4,"start"]];
   return`<svg width="${W}" height="${W}" viewBox="0 0 ${W} ${W}">${rings}${zero}
     ${cats.map((k,i)=>`<line x1="${C}" y1="${C}" x2="${pt(i,1)[0]}" y2="${pt(i,1)[1]}" stroke="var(--line)"/>`).join("")}
-    <polygon points="${poly}" fill="rgba(180,243,77,.25)" stroke="var(--acc)" stroke-width="2"/>
-    ${cats.map((k,i)=>{const p=pt(i,norm(avg[k]));return`<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="var(--acc)"/>`;}).join("")}
+    <polygon points="${poly}" fill="rgba(65,227,187,.22)" stroke="var(--teal)" stroke-width="2"/>
+    ${cats.map((k,i)=>{const p=pt(i,norm(avg[k]));return`<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="var(--teal)"/>`;}).join("")}
     ${labels.map(l=>`<text x="${l[1]}" y="${l[2]}" fill="var(--dim)" font-size="11" text-anchor="${l[3]}">${l[0]}</text>`).join("")}
   </svg>`;
 }
@@ -570,11 +1045,10 @@ function trend(vals){
   const W=300,H=90,n=vals.length,mn=Math.min(...vals)-2,mx=Math.max(...vals)+2;
   const x=i=>10+i*(W-20)/Math.max(1,n-1),y=v=>H-10-(v-mn)*(H-20)/(mx-mn);
   const pts=vals.map((v,i)=>`${x(i)},${y(v)}`).join(" ");
-  return`<svg width="100%" viewBox="0 0 ${W} ${H}"><polyline points="${pts}" fill="none" stroke="var(--acc)" stroke-width="2"/>
-    ${vals.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="3" fill="var(--acc)"/><text x="${x(i)}" y="${y(v)-7}" fill="var(--dim)" font-size="9" text-anchor="middle">${v}</text>`).join("")}</svg>`;
+  return`<svg width="100%" viewBox="0 0 ${W} ${H}"><polyline points="${pts}" fill="none" stroke="var(--teal)" stroke-width="2"/>
+    ${vals.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="3" fill="var(--teal)"/><text x="${x(i)}" y="${y(v)-7}" fill="var(--dim)" font-size="9" text-anchor="middle">${v}</text>`).join("")}</svg>`;
 }
 function drilldowns(){
-  // approach buckets & putting buckets across all rounds
   const app={"30–100":[], "100–150":[], "150–200":[], "200+":[]};
   const putts={"<6 ft":{n:0,made:0},"6–15 ft":{n:0,made:0},"15–30 ft":{n:0,made:0},"30+ ft":{n:0,made:0}};
   S.rounds.forEach(r=>r.holes.forEach(h=>h.shots.forEach((s,i)=>{
@@ -592,46 +1066,51 @@ function drilldowns(){
     const v=a.reduce((x,y)=>x+y,0)/a.length;
     return`<div class="bar"><span class="l">${k} yd</span><div class="track">
       <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line)"></div>
-      <div class="fill" style="${v>=0?"left:50%;":"right:50%;"}width:${Math.min(1,Math.abs(v)/0.5)*50}%;background:${v>=0?"var(--acc)":"var(--red)"}"></div></div>
-      <span class="v ${v>=0?"acc":"red"}">${v>=0?"+":""}${v.toFixed(2)}</span></div>`;
+      <div class="fill" style="${v>=0?"left:50%;":"right:50%;"}width:${Math.min(1,Math.abs(v)/0.5)*50}%;background:${v>=0?"var(--teal)":"var(--red)"}"></div></div>
+      <span class="v ${v>=0?"teal":"red"}">${v>=0?"+":""}${v.toFixed(2)}</span></div>`;
   }).join("");
   const puttRows=Object.keys(putts).map(k=>{
     const p=putts[k];if(!p.n)return"";
     return`<div class="bar"><span class="l">${k}</span><div class="track">
       <div class="fill" style="left:0;width:${p.made/p.n*100}%;background:var(--blue)"></div></div>
-      <span class="v blue">${Math.round(p.made/p.n*100)}%</span></div>`;
+      <span class="v" style="color:var(--blue)">${Math.round(p.made/p.n*100)}%</span></div>`;
   }).join("");
   let out="";
-  if(appRows.trim())out+=`<div class="card"><h3>Approach — avg SG per shot</h3>${appRows}</div>`;
-  if(puttRows.trim())out+=`<div class="card"><h3>Putting — make % by distance</h3>${puttRows}</div>`;
+  if(appRows.trim())out+=`<div class="card"><b>Approach — avg SG per shot</b><div class="mt">${appRows}</div></div>`;
+  if(puttRows.trim())out+=`<div class="card"><b>Putting — make % by distance</b><div class="mt">${puttRows}</div></div>`;
   return out;
 }
 
-/* ================= BAG / SETTINGS ================= */
+/* ================= BAG ================= */
 function vBag(){
   const learned=clubAverages();
-  return`<div class="card"><h3>My bag — carry distances</h3>
+  return`<h1 class="title">Bag</h1>
+  <div class="card"><b>My bag — carry distances</b><div class="mt">
     ${S.bag.map((b,i)=>`<div class="row mb">
       <input value="${esc(b.name)}" onchange="S.bag[${i}].name=this.value;save()" style="flex:2">
       <input type="number" value="${b.carry}" onchange="S.bag[${i}].carry=+this.value;save()" style="flex:1">
       <span class="dim small" style="width:58px">${learned[b.name]?"📊 "+learned[b.name]:""}</span>
-      <button class="btn sm ghost red" onclick="S.bag.splice(${i},1);save();render()">✕</button></div>`).join("")}
+      <button class="btn sm" style="color:var(--red);background:none" onclick="S.bag.splice(${i},1);save();render()">✕</button></div>`).join("")}
     <button class="btn sm mt" onclick="S.bag.push({name:'Club',carry:100});save();render()">+ Add club</button>
     <div class="dim small mt">📊 = your real average from MLM2Pro data + tracked shots (the caddie uses it once it has 3+ samples).</div>
+  </div></div>
+  <div class="card"><b>Handicap</b>
+    <div class="row mt"><span class="dim grow">Used for net scoring &amp; stableford</span>
+    <div class="stepper"><button onclick="S.hcap=Math.max(0,S.hcap-1);save();render()">−</button><b>${S.hcap}</b><button onclick="S.hcap=Math.min(54,S.hcap+1);save();render()">+</button></div></div>
   </div>
-  <div class="card"><h3>Data</h3>
-    <div class="row"><button class="btn grow" onclick="exportData()">⬆ Export backup</button>
+  <div class="card"><b>Data</b>
+    <div class="row mt"><button class="btn grow" onclick="exportData()">⬆ Export backup</button>
     <button class="btn grow" onclick="importData()">⬇ Import</button></div>
     <textarea id="io" class="mt" placeholder="Backup JSON appears / paste here"></textarea>
-    <button class="btn red mt" onclick="if(confirm('Erase ALL rounds, MLM2Pro data and settings?')){localStorage.removeItem('tangent_v1');location.reload();}">Reset everything</button>
+    <button class="btn mt" style="color:var(--red)" onclick="if(confirm('Erase ALL rounds, MLM2Pro data and settings?')){localStorage.removeItem('tangent_v1');localStorage.removeItem('tangent_course');location.reload();}">Reset everything</button>
   </div>
-  <div class="dim small center">Strokes gained vs scratch baseline (Broadie). Personal use only.</div>`;
+  <div class="dim small center">Strokes gained vs scratch (Broadie). Course outlines © OpenStreetMap. Imagery © Esri. Weather © Open-Meteo. Personal use only.</div>`;
 }
 function exportData(){document.getElementById("io").value=JSON.stringify(S);document.getElementById("io").select();
   try{navigator.clipboard.writeText(JSON.stringify(S));alert("Backup copied to clipboard.");}catch(e){}}
-function importData(){try{const d=JSON.parse(document.getElementById("io").value);if(!d.bag)throw 0;S=d;save();render();alert("Imported ✓");}catch(e){alert("Paste a valid backup first.");}}
+function importData(){try{const d=JSON.parse(document.getElementById("io").value);if(!d.bag)throw 0;S=d;S.lm=S.lm||{};S.favs=S.favs||[];save();render();alert("Imported ✓");}catch(e){alert("Paste a valid backup first.");}}
 
-go("play");
+go("golf");
 </script>
 </body>
 </html>
