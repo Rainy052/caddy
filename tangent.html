@@ -657,11 +657,26 @@ function synthHoles(course){
       // route the hole THROUGH its fairway: tee end = fairway vertex farthest from the green
       let far=null,fdd=-1;for(const p of fw.pts){const d=distYds(p,gc);if(d>fdd){fdd=d;far=p;}}
       const fc=centroid(fw.pts);
-      // back tee = tee near the fairway's tee end, farthest from the green
+      // back tee = near the fairway's tee end, BEHIND it, aimed down the same corridor,
+      // and a typical distance (~40 yd) behind the fairway start — not a neighbour's tee
+      const brgFar=bearing(far,gc);
       let tee=null,best=-1;
-      for(const t of tees){if(distYds(t.c,far)<170){const dG=distYds(t.c,gc);if(dG>best){best=dG;tee=t.c;}}}
+      for(const t of tees){
+        if(distYds(t.c,far)>200)continue;
+        const dG=distYds(t.c,gc);
+        if(dG<=fdd-15||dG-fdd>120)continue;   // behind the fairway start, but not absurdly far back
+        let ang=Math.abs(bearing(t.c,gc)-brgFar);ang=Math.min(ang,360-ang);
+        if(ang>35)continue;
+        if(dG>best){best=dG;tee=t.c;}          // back tee = farthest plausible
+      }
       if(!tee)tee=offsetPt(far,bearing(gc,far),20);
       line=[tee,fc,gc];
+      if(polylineLen(line)<110){
+        // fairway match was bogus (an apron, probably) — treat as a par 3 instead
+        let t3=null,bd3=1e9;
+        for(const t of tees){const d=distYds(t.c,gc);if(d>90&&d<650&&d<bd3){bd3=d;t3=t.c;}}
+        if(t3)line=[t3,gc];
+      }
     }else{
       // no fairway (par 3): tee straight to green
       let tee=null,bd=1e9;
@@ -755,7 +770,7 @@ function curHole(){return S.active?S.active.holes[S.active.cur]:null;}
 let map=null,youMarker=null,teeMarker=null,flagMarker=null,fromMarker=null,courseLayer=null,holeLayer=null,shotLayer=null,aimLayer=null,greenPolys=[];
 let POS=null,TEEPOS=null,FLAG=null,AIM=null,GREEN=null,WATCH=null,COURSEDRAWN=false;
 let WINDMODE="auto",WINDMAN=0;
-let ELEV={ft:null},ELEVKEY=null;
+let ELEV={ft:null},ELEVKEY=null,HOLECTR=null;
 const HSTYLE={
   rough:{stroke:false,fillColor:"#132e0e",fillOpacity:.30,interactive:false},
   fairway:{color:"#54e866",weight:1.5,opacity:.75,fillColor:"#4fdd60",fillOpacity:.45,interactive:false},
@@ -819,13 +834,16 @@ function holeGeom(i){
 }
 // per-hole fairway cache: which fairway polygons belong to the current hole,
 // plus a grid of points inside them (used to keep the layup target on the short grass)
-let HOLEFWY={polys:[],samples:[]};
+let HOLEFWY={polys:[],samples:[],line:[]};
 function buildHoleFwy(center){
-  HOLEFWY={polys:[],samples:[]};
-  if(!COURSE||!COURSE.fairways||!COURSE.fairways.length||!center||center.length<2)return;
+  HOLEFWY={polys:[],samples:[],line:[]};
+  if(!center||center.length<2)return;
   const total=polylineLen(center);
-  const line=[];
+  const line=[center[0]];
   for(let d=20;d<total-10;d+=25)line.push(...slicePolyline(center,d,d+1));
+  line.push(center[center.length-1]);
+  HOLEFWY.line=line;   // the hole's route — flight paths should stay near it (doglegs!)
+  if(!COURSE||!COURSE.fairways||!COURSE.fairways.length)return;
   HOLEFWY.polys=COURSE.fairways.filter(f=>line.some(s=>pointInPoly(s,f.pts)));
   for(const f of HOLEFWY.polys){
     let mnLa=90,mxLa=-90,mnLo=180,mxLo=-180;
@@ -873,6 +891,7 @@ function showHole(i){
     if(ga.d<gb.d){teeEnd=b;g=ga;}
     TEEPOS={lat:teeEnd.lat,lng:teeEnd.lng};
     const center=(teeEnd===a)?hg.pts:hg.pts.slice().reverse();
+    HOLECTR=center;
     buildHoleFwy(center);
     drawHoleCorridor(center);
     setFlagOnGreen(g.green&&g.d<120?g.green:null,teeEnd===a?b:a);
@@ -880,7 +899,7 @@ function showHole(i){
     if(!teeMarker)teeMarker=L.marker([teeEnd.lat,teeEnd.lng],{interactive:false,icon:L.divIcon({className:"",html:"<div class='teeDot'></div>",iconAnchor:[8,8]})}).addTo(map);
     else teeMarker.setLatLng([teeEnd.lat,teeEnd.lng]);
   }else{
-    FLAG=null;GREEN=null;HOLEFWY={polys:[],samples:[]};
+    FLAG=null;GREEN=null;HOLEFWY={polys:[],samples:[],line:[]};HOLECTR=null;
     if(holeLayer)holeLayer.clearLayers();
     if(flagMarker){flagMarker.remove();flagMarker=null;}
     if(map&&COURSE)map.setView([COURSE.center.lat,COURSE.center.lng],16);
@@ -945,7 +964,20 @@ function startGps(){
     // auto-mark the tee the first time you're on the hole, so "Mark ball" just measures
     if(onHole&&!EXPLORE&&S.active&&FLAG){
       const h=curHole();
-      if(h&&!h.from&&!h.shots.length){setFrom({lat:POS.lat,lng:POS.lng,lie:"tee"});toast("Tee marked — walk to your ball, tap 📍");}
+      if(h&&!h.from&&!h.shots.length){
+        setFrom({lat:POS.lat,lng:POS.lng,lie:"tee"});
+        // you're standing on the REAL tee — snap the hole's tee to you (fixes wrong OSM tee boxes)
+        if(TEEPOS&&distYds(POS,TEEPOS)<300){
+          TEEPOS={lat:POS.lat,lng:POS.lng};
+          if(teeMarker)teeMarker.setLatLng([TEEPOS.lat,TEEPOS.lng]);
+          if(HOLECTR&&HOLECTR.length>1){
+            HOLECTR=[{lat:POS.lat,lng:POS.lng},...HOLECTR.slice(1)];
+            buildHoleFwy(HOLECTR);
+            drawHoleCorridor(HOLECTR);
+          }
+        }
+        toast("Tee marked — walk to your ball, tap 📍");
+      }
     }
     recalcHole();
   },e=>{document.getElementById("gpsBtn").textContent="🚫";WATCH=null;
@@ -1046,19 +1078,33 @@ function recommend(e){
   if(under&&e-under.carry<=4)return{club:under.name,note:"smooth full"};
   return{club:over.name,note:"swing easy"};
 }
+function flightOk(from,to){
+  // a shot is only "optimal" if its whole flight stays near the hole's route —
+  // on a dogleg, cutting the corner means flying over the trees
+  if(!HOLEFWY.line.length)return true;
+  for(const f of[0.3,0.5,0.7,0.85]){
+    const m=lerpPoint(from,to,f);
+    const onFwy=HOLEFWY.polys.some(pg=>pointInPoly(m,pg.pts));
+    const nearLine=HOLEFWY.line.some(s=>distYds(m,s)<55);
+    if(!onFwy&&!nearLine)return false;
+  }
+  return true;
+}
 function planLayup(rawDist,p,tgt){
   const clubs=bagSorted();
   let choice=clubs[0];
   for(const c of clubs){if(rawDist-c.carry>=40){choice=c;break;}}
   const carry=Math.min(choice.carry,rawDist-10);
   let pt=lerpPoint(p,tgt,carry/rawDist);
-  // if we know where the fairway is and the straight-line target misses it,
-  // steer the layup onto the short grass instead of through the trees
-  if(HOLEFWY.samples.length&&!HOLEFWY.polys.some(f=>pointInPoly(pt,f.pts))){
+  // steer whenever the straight-line target misses the fairway OR the flight
+  // would cut a dogleg corner through the trees
+  const straightBad=(HOLEFWY.polys.length&&!HOLEFWY.polys.some(f=>pointInPoly(pt,f.pts)))||!flightOk(p,pt);
+  if(HOLEFWY.samples.length&&straightBad){
     let best=null,bs=1e12;
     for(const s of HOLEFWY.samples){
       const d=distYds(p,s);
       if(d>choice.carry+6||d<carry*0.45)continue;      // must be a real shot this club reaches
+      if(!flightOk(p,s))continue;                       // no corner-cutting over trees
       const score=distYds(s,tgt)+Math.abs(d-carry)*0.7; // most progress, comfortable distance
       if(score<bs){bs=score;best={s,d};}
     }
