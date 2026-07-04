@@ -218,12 +218,12 @@ nav button.on .ic{filter:drop-shadow(0 0 6px rgba(217,244,82,.5))}
 /* ================= STATE ================= */
 const DEFAULT_BAG=[["Driver",230],["3 Wood",210],["5 Wood",195],["4i",180],["5i",170],["6i",160],["7i",150],["8i",140],["9i",130],["PW",118],["GW",105],["SW",90],["LW",75]];
 let S=load();
-function load(){try{const d=JSON.parse(localStorage.getItem("tangent_v1"));if(d&&d.bag){d.lm=d.lm||{};d.favs=d.favs||[];d.hcap=d.hcap===undefined?8:d.hcap;return d;}}catch(e){}
+function load(){try{const d=JSON.parse(localStorage.getItem("tangent_v1"));if(d&&d.bag){d.lm=d.lm||{};d.favs=d.favs||[];d.hcap=d.hcap===undefined?8:d.hcap;d.teeFix=d.teeFix||{};return d;}}catch(e){}
   return {bag:DEFAULT_BAG.map(c=>({name:c[0],carry:c[1]})),rounds:[],active:null,lm:{},favs:[],hcap:8};}
 function save(){localStorage.setItem("tangent_v1",JSON.stringify(S));}
 function today(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
 function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
-const CVER=9; // bump whenever the course parser changes — invalidates stale phone caches
+const CVER=10; // bump whenever the course parser changes — invalidates stale phone caches
 let COURSE=null; try{COURSE=JSON.parse(localStorage.getItem("tangent_course"));if(!COURSE||COURSE.v!==CVER)COURSE=null;}catch(e){COURSE=null;}
 function saveCourse(){localStorage.setItem("tangent_course",JSON.stringify(COURSE));}
 
@@ -658,20 +658,26 @@ function synthHoles(course){
     });
     if(gi>=0&&(!fwyByGreen[gi]||polyArea(f.pts)>polyArea(fwyByGreen[gi].pts)))fwyByGreen[gi]=f;
   });
+  // numbered green positions — a hole's tee usually sits beside the PREVIOUS hole's green
+  const greensN=course.greens.filter(g=>g.ref&&!isNaN(parseInt(g.ref))).map(g=>({n:parseInt(g.ref),c:centroid(g.pts)}));
+  const prevGreen=hn=>{if(!hn)return null;const pg=greensN.find(g=>g.n===hn-1);return pg?pg.c:null;};
   const built=course.greens.map((g,i)=>{
     const gc=centroid(g.pts);
     const gref=g.ref&&!isNaN(parseInt(g.ref))?parseInt(g.ref):null;
     const fw=fwyByGreen[i];
+    const pg=prevGreen(gref);
     let line;
     if(fw){
       // route the hole THROUGH its fairway: tee end = fairway vertex farthest from the green
       let far=null,fdd=-1;for(const p of fw.pts){const d=distYds(p,gc);if(d>fdd){fdd=d;far=p;}}
       const fc=centroid(fw.pts);
       // back tee = behind the fairway start and aimed down the fairway OPENING
-      // (dogleg-correct); prefer tightly aligned tees so a neighbour's tee never wins
+      // (dogleg-correct); tees from neighbouring holes cluster here, so:
+      // 1) prefer a tee beside the previous hole's green (that's OUR tee by routing)
+      // 2) else take the MEDIAN of the aligned cluster (back tees of other holes sit deeper)
       const open=bearing(far,fc);
-      const pickTee=maxAng=>{
-        let t0=null,best=-1;
+      const candTees=maxAng=>{
+        const out=[];
         for(const t of tees){
           const dFar=distYds(t.c,far);
           if(dFar>200)continue;
@@ -679,9 +685,18 @@ function synthHoles(course){
           if(dG<=fdd-15||dG-fdd>120)continue;  // behind the start, not absurdly far back
           let ang=Math.abs(bearing(t.c,far)-open);ang=Math.min(ang,360-ang);
           if(dFar>15&&ang>maxAng)continue;     // must line up with the fairway opening
-          if(dG>best){best=dG;t0=t.c;}
+          out.push({c:t.c,dG});
         }
-        return t0;
+        return out.sort((a,b)=>a.dG-b.dG);
+      };
+      const pickTee=maxAng=>{
+        const cand=candTees(maxAng);
+        if(!cand.length)return null;
+        if(pg){
+          const nearPrev=cand.filter(t=>distYds(t.c,pg)<85);
+          if(nearPrev.length)return nearPrev[nearPrev.length-1].c;  // farthest of OUR tee set
+        }
+        return cand[Math.floor((cand.length-1)/2)].c;               // median of the cluster
       };
       let tee=pickTee(14)||pickTee(35);
       if(!tee)tee=offsetPt(far,bearing(gc,far),20);
@@ -693,9 +708,10 @@ function synthHoles(course){
         if(t3)line=[t3,gc];
       }
     }else{
-      // no fairway (par 3): tee straight to green
+      // no fairway (par 3): prefer the tee set beside the previous green, else nearest plausible
       let tee=null,bd=1e9;
       if(gref!=null){let farD=-1;for(const t of tees){if(t.ref===gref){const d=distYds(t.c,gc);if(d>60&&d<700&&d>farD){farD=d;tee=t.c;}}}}
+      if(!tee&&pg){let farD=-1;for(const t of tees){if(distYds(t.c,pg)<85){const d=distYds(t.c,gc);if(d>60&&d<650&&d>farD){farD=d;tee=t.c;}}}}
       if(!tee)for(const t of tees){const d=distYds(t.c,gc);if(d>90&&d<650&&d<bd){bd=d;tee=t.c;}}
       if(!tee)tee=offsetPt(gc,bearing(gc,course.center),175);
       line=[tee,gc];
@@ -789,7 +805,7 @@ let ELEV={ft:null},ELEVKEY=null,HOLECTR=null;
 const HSTYLE={
   rough:{stroke:false,fillColor:"#132e0e",fillOpacity:.30,interactive:false},
   fairway:{color:"#54e866",weight:1.5,opacity:.75,fillColor:"#4fdd60",fillOpacity:.45,interactive:false},
-  tee:{color:"#ffffff",weight:1.5,opacity:.85,fillColor:"#57dd68",fillOpacity:.45,interactive:false},
+  tee:{color:"#ffffff",weight:1.5,opacity:.85,fillColor:"#57dd68",fillOpacity:.45},
   bunker:{color:"#3a3320",weight:1.5,opacity:.95,fillColor:"#efe07a",fillOpacity:.92,interactive:false},
   water:{color:"#3fe3d0",weight:1.5,opacity:.95,fillColor:"#37c4d6",fillOpacity:.6,interactive:false},
   green:{color:"#d4ff7a",weight:2.5,opacity:1,fillColor:"#74f58a",fillOpacity:.6},
@@ -835,7 +851,11 @@ function drawCourseLayers(){
   draw(COURSE.fairways,HSTYLE.fairway);
   draw(COURSE.water,HSTYLE.water);
   draw(COURSE.bunkers,HSTYLE.bunker);
-  draw(COURSE.tees,HSTYLE.tee);
+  // tee boxes are tappable: tap one to say "this hole plays from here" (saved per hole)
+  for(const t of COURSE.tees||[]){
+    const poly=L.polygon(t.pts.map(p=>[p.lat,p.lng]),HSTYLE.tee).addTo(courseLayer);
+    poly.on("click",e=>{L.DomEvent.stopPropagation(e);setTeeHere(centroid(t.pts));});
+  }
   for(const g of COURSE.greens){
     const poly=L.polygon(g.pts.map(p=>[p.lat,p.lng]),HSTYLE.green).addTo(courseLayer);
     poly.on("click",e=>{L.DomEvent.stopPropagation(e);setFlagOnGreen(g);});
@@ -907,7 +927,10 @@ function showHole(i){
     let teeEnd=a,g=gb;
     if(ga.d<gb.d){teeEnd=b;g=ga;}
     TEEPOS={lat:teeEnd.lat,lng:teeEnd.lng};
-    const center=(teeEnd===a)?hg.pts:hg.pts.slice().reverse();
+    let center=(teeEnd===a)?hg.pts:hg.pts.slice().reverse();
+    // user-corrected tee for this hole (tap a tee box on the map to set it)
+    const fix=(S.teeFix||{})[teeKey(i)];
+    if(fix){TEEPOS={lat:fix.lat,lng:fix.lng};center=[{lat:fix.lat,lng:fix.lng},...center.slice(1)];}
     HOLECTR=center;
     buildHoleFwy(center);
     drawHoleCorridor(center);
@@ -928,6 +951,21 @@ function showHole(i){
   recalcHole();
 }
 let EXPLOREIDX=0;
+function teeKey(i){
+  const hg=holeGeom(i);
+  const cn=EXPLORE?(SETUP.course?SETUP.course.name:""):(S.active?S.active.course:"");
+  return cn+"|"+(hg&&hg.ref?hg.ref:(i+1));
+}
+function setTeeHere(pt){
+  if(document.getElementById("holeScreen").classList.contains("hidden"))return;
+  const i=EXPLORE?EXPLOREIDX:(S.active?S.active.cur:null);
+  if(i==null)return;
+  S.teeFix=S.teeFix||{};
+  S.teeFix[teeKey(i)]={lat:pt.lat,lng:pt.lng};
+  save();
+  showHole(i);
+  toast("Tee set — this hole now plays from here ✓");
+}
 function setFlagOnGreen(g,fallbackPt){
   GREEN=g||null;
   const pt=g?centroid(g.pts):fallbackPt;
