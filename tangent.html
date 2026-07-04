@@ -223,7 +223,7 @@ function load(){try{const d=JSON.parse(localStorage.getItem("tangent_v1"));if(d&
 function save(){localStorage.setItem("tangent_v1",JSON.stringify(S));}
 function today(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
 function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
-const CVER=8; // bump whenever the course parser changes — invalidates stale phone caches
+const CVER=9; // bump whenever the course parser changes — invalidates stale phone caches
 let COURSE=null; try{COURSE=JSON.parse(localStorage.getItem("tangent_course"));if(!COURSE||COURSE.v!==CVER)COURSE=null;}catch(e){COURSE=null;}
 function saveCourse(){localStorage.setItem("tangent_course",JSON.stringify(COURSE));}
 
@@ -561,7 +561,10 @@ async function loadCourse(c){
  way["natural"="water"](around:3200,${c.lat},${c.lng});
  way["leisure"="golf_course"](around:3200,${c.lat},${c.lng});
  relation["golf"~"fairway|green|bunker|tee|water_hazard"](around:3200,${c.lat},${c.lng});
- relation["leisure"="golf_course"](around:3200,${c.lat},${c.lng}););
+ relation["leisure"="golf_course"](around:3200,${c.lat},${c.lng});
+ way["natural"="wood"](around:2200,${c.lat},${c.lng});
+ relation["natural"="wood"](around:2200,${c.lat},${c.lng});
+ way["landuse"="forest"](around:2200,${c.lat},${c.lng}););
 out geom;`;
   try{
     // two full passes over the mirror chain — the map servers rate-limit under load
@@ -571,7 +574,7 @@ out geom;`;
     }
     if(!data)throw ferr||new Error("no data");
     // collect everything first, then clip to the ONE course boundary we selected
-    const raw={greens:[],bunkers:[],fairways:[],tees:[],water:[],holes:[],boundaries:[]};
+    const raw={greens:[],bunkers:[],fairways:[],tees:[],water:[],holes:[],boundaries:[],woods:[]};
     const sortRaw=(tags,pts,fromRel)=>{
       if(pts.length<3)return;
       if(tags.golf==="green")raw.greens.push({pts,ref:tags.ref||null});
@@ -579,6 +582,7 @@ out geom;`;
       else if(tags.golf==="fairway")raw.fairways.push({pts});
       else if(tags.golf==="tee")raw.tees.push({pts,ref:tags.ref||null});
       else if(tags.golf==="water_hazard"||tags.natural==="water")raw.water.push({pts});
+      else if(tags.natural==="wood"||tags.landuse==="forest")raw.woods.push({pts});
       else if(tags.leisure==="golf_course")raw.boundaries.push({pts});
     };
     for(const el of data.elements){
@@ -624,6 +628,12 @@ out geom;`;
       greens:filt(raw.greens),bunkers:filt(raw.bunkers),fairways:filt(raw.fairways),
       tees:filt(raw.tees),water:filt(raw.water),holes:filt(raw.holes),
       boundary:rings,holesSorted:[]};
+    // trees: woods near the course gate the layup flight path (no clipping by boundary —
+    // tree lines often straddle the course edge); simplify + cap to keep the cache small
+    COURSE.woods=raw.woods
+      .filter(w=>w.pts.some(p=>distYds(p,ctr)<1400))
+      .map(w=>{const n=w.pts.length;if(n<=48)return w;const st=Math.ceil(n/48);return{pts:w.pts.filter((_,i)=>i%st===0)};})
+      .filter(w=>w.pts.length>=3).slice(0,60);
     COURSE.holesSorted=COURSE.holes.filter(h=>h.ref!==null&&!isNaN(parseInt(h.ref))).sort((a,b)=>parseInt(a.ref)-parseInt(b.ref));
     synthHoles(COURSE);   // rebuild holes from greens+tees when OSM has no hole centerlines
     saveCourse();
@@ -657,18 +667,23 @@ function synthHoles(course){
       // route the hole THROUGH its fairway: tee end = fairway vertex farthest from the green
       let far=null,fdd=-1;for(const p of fw.pts){const d=distYds(p,gc);if(d>fdd){fdd=d;far=p;}}
       const fc=centroid(fw.pts);
-      // back tee = near the fairway's tee end, BEHIND it, aimed down the same corridor,
-      // and a typical distance (~40 yd) behind the fairway start — not a neighbour's tee
-      const brgFar=bearing(far,gc);
-      let tee=null,best=-1;
-      for(const t of tees){
-        if(distYds(t.c,far)>200)continue;
-        const dG=distYds(t.c,gc);
-        if(dG<=fdd-15||dG-fdd>120)continue;   // behind the fairway start, but not absurdly far back
-        let ang=Math.abs(bearing(t.c,gc)-brgFar);ang=Math.min(ang,360-ang);
-        if(ang>35)continue;
-        if(dG>best){best=dG;tee=t.c;}          // back tee = farthest plausible
-      }
+      // back tee = behind the fairway start and aimed down the fairway OPENING
+      // (dogleg-correct); prefer tightly aligned tees so a neighbour's tee never wins
+      const open=bearing(far,fc);
+      const pickTee=maxAng=>{
+        let t0=null,best=-1;
+        for(const t of tees){
+          const dFar=distYds(t.c,far);
+          if(dFar>200)continue;
+          const dG=distYds(t.c,gc);
+          if(dG<=fdd-15||dG-fdd>120)continue;  // behind the start, not absurdly far back
+          let ang=Math.abs(bearing(t.c,far)-open);ang=Math.min(ang,360-ang);
+          if(dFar>15&&ang>maxAng)continue;     // must line up with the fairway opening
+          if(dG>best){best=dG;t0=t.c;}
+        }
+        return t0;
+      };
+      let tee=pickTee(14)||pickTee(35);
       if(!tee)tee=offsetPt(far,bearing(gc,far),20);
       line=[tee,fc,gc];
       if(polylineLen(line)<110){
@@ -834,15 +849,17 @@ function holeGeom(i){
 }
 // per-hole fairway cache: which fairway polygons belong to the current hole,
 // plus a grid of points inside them (used to keep the layup target on the short grass)
-let HOLEFWY={polys:[],samples:[],line:[]};
+let HOLEFWY={polys:[],samples:[],line:[],woods:[]};
 function buildHoleFwy(center){
-  HOLEFWY={polys:[],samples:[],line:[]};
+  HOLEFWY={polys:[],samples:[],line:[],woods:[]};
   if(!center||center.length<2)return;
   const total=polylineLen(center);
   const line=[center[0]];
   for(let d=20;d<total-10;d+=25)line.push(...slicePolyline(center,d,d+1));
   line.push(center[center.length-1]);
   HOLEFWY.line=line;   // the hole's route — flight paths should stay near it (doglegs!)
+  HOLEFWY.woods=(COURSE&&COURSE.woods?COURSE.woods:[])
+    .filter(w=>w.pts.some(p=>line.some(s=>distYds(p,s)<150))).slice(0,20);
   if(!COURSE||!COURSE.fairways||!COURSE.fairways.length)return;
   HOLEFWY.polys=COURSE.fairways.filter(f=>line.some(s=>pointInPoly(s,f.pts)));
   for(const f of HOLEFWY.polys){
@@ -899,7 +916,7 @@ function showHole(i){
     if(!teeMarker)teeMarker=L.marker([teeEnd.lat,teeEnd.lng],{interactive:false,icon:L.divIcon({className:"",html:"<div class='teeDot'></div>",iconAnchor:[8,8]})}).addTo(map);
     else teeMarker.setLatLng([teeEnd.lat,teeEnd.lng]);
   }else{
-    FLAG=null;GREEN=null;HOLEFWY={polys:[],samples:[],line:[]};HOLECTR=null;
+    FLAG=null;GREEN=null;HOLEFWY={polys:[],samples:[],line:[],woods:[]};HOLECTR=null;
     if(holeLayer)holeLayer.clearLayers();
     if(flagMarker){flagMarker.remove();flagMarker=null;}
     if(map&&COURSE)map.setView([COURSE.center.lat,COURSE.center.lng],16);
@@ -1079,8 +1096,12 @@ function recommend(e){
   return{club:over.name,note:"swing easy"};
 }
 function flightOk(from,to){
-  // a shot is only "optimal" if its whole flight stays near the hole's route —
-  // on a dogleg, cutting the corner means flying over the trees
+  // a shot is only "optimal" if its whole flight stays near the hole's route
+  // AND never crosses mapped trees — no cutting dogleg corners over the woods
+  for(const f of[0.15,0.3,0.45,0.6,0.75,0.9]){
+    const m=lerpPoint(from,to,f);
+    if(HOLEFWY.woods.some(w=>pointInPoly(m,w.pts)))return false;
+  }
   if(!HOLEFWY.line.length)return true;
   for(const f of[0.3,0.5,0.7,0.85]){
     const m=lerpPoint(from,to,f);
