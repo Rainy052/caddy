@@ -828,6 +828,11 @@ function enterHole(){
   drawCourseLayers();
   showHole(EXPLORE?0:S.active.cur);
   startGps();
+  if(!S.teeHintSeen&&COURSE&&COURSE.tees&&COURSE.tees.length){
+    S.teeHintSeen=true;save();
+    setTimeout(()=>toast("Wrong tee box? Tap the correct one on the map to fix it.",true),1400);
+    setTimeout(()=>{const t=document.getElementById("toast");if(t)t.style.opacity="0";},9000);
+  }
 }
 function exitHole(){
   document.getElementById("holeScreen").classList.add("hidden");
