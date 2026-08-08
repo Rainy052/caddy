@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Tangent — Personal Edition</title>
@@ -22,9 +22,9 @@ body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSys
 main{flex:1;overflow-y:auto;padding:calc(14px + var(--st)) 14px 110px}
 h1.title{font-size:34px;font-weight:800;text-align:center;margin:6px 0 14px}
 .card{background:var(--panel);border-radius:20px;padding:16px;margin-bottom:12px}
-.rowcard{background:var(--row);border-radius:18px;padding:16px;margin-bottom:10px;cursor:pointer}
+.rowcard{background:var(--row);border-radius:18px;padding:16px;margin-bottom:10px;cursor:pointer;overflow-wrap:anywhere}
 .row{display:flex;align-items:center;gap:10px}
-.grow{flex:1}
+.grow{flex:1;min-width:0}
 .dim{color:var(--dim)}.teal{color:var(--teal)}.yellow{color:var(--yellow)}.red{color:var(--red)}
 .small{font-size:13px}.mono{font-variant-numeric:tabular-nums}
 .mt{margin-top:10px}.mb{margin-bottom:10px}.center{text-align:center}
@@ -33,9 +33,10 @@ h1.title{font-size:34px;font-weight:800;text-align:center;margin:6px 0 14px}
 .btn.ghostb{background:var(--panel);color:var(--teal)}
 .btn.sm{padding:6px 14px;font-size:13px;border-radius:10px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:4px}
 .btn:active{opacity:.75}
+.btn:disabled{opacity:.55;pointer-events:none}
 input,select,textarea{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:12px;padding:12px;font-size:16px;width:100%}
 label.fl{display:block;font-size:12px;color:var(--dim);margin:10px 0 5px;text-transform:uppercase;letter-spacing:.6px;font-weight:700}
-textarea{font-family:monospace;font-size:12px;min-height:90px}
+textarea{font-family:monospace;font-size:16px;min-height:90px}/* 16px: iOS won't force-zoom the focused field */
 /* pills / segmented */
 .pillseg{display:inline-flex;background:#e8ede9;border-radius:999px;padding:3px}
 .pillseg button{border:none;background:none;color:#233;font-size:16px;font-weight:700;padding:0 22px;min-height:44px;display:inline-flex;align-items:center;border-radius:999px;cursor:pointer}
@@ -200,26 +201,26 @@ nav button.on .ic{filter:drop-shadow(0 0 6px rgba(217,244,82,.5))}
     <div class="bf"><span id="fcbF">—</span><span class="u">f</span></div>
   </div>
   <div id="hcap"></div>
-  <button class="hudBtn" id="closeHole" onclick="exitHole()">✕</button>
+  <button class="hudBtn" id="closeHole" onclick="exitHole()" aria-label="Close hole and return to courses">✕</button>
   <div id="sideCol">
-    <button class="hudBtn" id="gpsBtn" onclick="startGps()" title="GPS">🧍</button>
-    <button class="hudBtn" onclick="refitHole()" title="Recenter">↻</button>
-    <button class="hudBtn" onclick="openLogSheet()" title="Log shot">✏️</button>
-    <button class="hudBtn" onclick="openScorecard()" title="Scorecard">🗒</button>
+    <button class="hudBtn" id="gpsBtn" onclick="startGps()" title="GPS" aria-label="Start GPS">🧍</button>
+    <button class="hudBtn" onclick="refitHole()" title="Recenter" aria-label="Recenter map on the hole">↻</button>
+    <button class="hudBtn" onclick="openLogSheet()" title="Log shot" aria-label="Log a shot manually">✏️</button>
+    <button class="hudBtn" onclick="openScorecard()" title="Scorecard" aria-label="Open scorecard">🗒</button>
   </div>
   <div id="markStack">
-    <button id="markBtn" onclick="markBall()"><span class="ic">📍</span>Mark ball</button>
-    <button id="holedBtn" onclick="holedIt()">🕳 Holed</button>
+    <button id="markBtn" onclick="markBall()" aria-label="Mark ball at your position"><span class="ic" aria-hidden="true">📍</span>Mark ball</button>
+    <button id="holedBtn" onclick="holedIt()" aria-label="Hole out"><span aria-hidden="true">🕳</span> Holed</button>
   </div>
   <div id="clubPill" style="display:none"><div><div class="club" id="pillClub">—</div><div class="opt" id="pillOpt">optimal</div></div><div class="altclub" id="pillAlt"></div></div>
   <div id="chipRow">
-    <div class="mchip arrowChip" onclick="navHole(-1)">‹</div>
-    <div class="mchip" onclick="fetchElev(true)"><span id="elevChip">—</span><small>ft elev</small></div>
-    <div class="mchip" onclick="cyclePar()"><span class="yellow" id="holeNum">1</span><small id="holePar">PAR 4</small></div>
-    <div class="mchip" onclick="cycleWind()"><span><span id="windArrow" style="display:inline-block">↑</span> <span id="windChip">—</span></span><small>mph</small></div>
-    <div class="mchip arrowChip" onclick="navHole(1)">›</div>
+    <div class="mchip arrowChip" role="button" tabindex="0" onclick="navHole(-1)" aria-label="Previous hole">‹</div>
+    <div class="mchip" role="button" tabindex="0" onclick="fetchElev(true)" aria-label="Elevation to green, tap to refresh"><span id="elevChip">—</span><small>ft elev</small></div>
+    <div class="mchip" role="button" tabindex="0" onclick="cyclePar()" aria-label="Par, tap to change"><span class="yellow" id="holeNum">1</span><small id="holePar">PAR 4</small></div>
+    <div class="mchip" role="button" tabindex="0" onclick="cycleWind()" aria-label="Wind, tap to change source"><span><span id="windArrow" style="display:inline-block" aria-hidden="true">↑</span> <span id="windChip">—</span></span><small>mph</small></div>
+    <div class="mchip arrowChip" role="button" tabindex="0" onclick="navHole(1)" aria-label="Next hole">›</div>
   </div>
-  <div id="toast"></div>
+  <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 </div>
 
 <div id="backdrop" class="hidden" onclick="closeSheet()"></div>
@@ -408,7 +409,7 @@ function vGolf(){
     <button class="${LISTMODE==="favs"?"on":""}" onclick="LISTMODE='favs';render()">Favorites</button>
     <button class="${LISTMODE==="nearby"?"on":""}" onclick="LISTMODE='nearby';render()">Nearby</button>
   </span></div>
-  <div class="searchbox"><span>🔍</span><input id="csearch" placeholder="Search courses" value="" onkeydown="if(event.key==='Enter')searchCourses(this.value)"></div>`;
+  <div class="searchbox"><span aria-hidden="true">🔍</span><input id="csearch" type="search" aria-label="Search courses" placeholder="Search courses" value="" onkeydown="if(event.key==='Enter')searchCourses(this.value)"></div>`;
   if(S.active){
     const done=S.active.holes.filter(h=>h.done).length;
     html+=`<div class="rowcard" style="border:1.5px solid var(--teal)" onclick="resumeRound()">
@@ -771,30 +772,44 @@ function nearestGreenTo(pt){
 
 /* ================= ROUND ================= */
 let EXPLORE=false;
+let STARTING=false;
 async function startRound(explore){
-  EXPLORE=explore;
-  const c=SETUP.course;
-  // make sure the SELECTED course's map is loaded before we build the round —
-  // never fall back to a stale/previous course
-  if(!COURSE||COURSE.name!==c.name||!COURSE.greens){
-    const note=document.getElementById("loadNote");if(note)note.textContent="Loading course map…";
-    await loadCourse(c);
+  if(STARTING)return;               // ignore double-taps while the map is loading
+  STARTING=true;
+  const btns=[...document.querySelectorAll("#setup .playbar .btn")];
+  const pressed=explore?btns[0]:btns[1];
+  const restoreLabel=pressed?pressed.textContent:null;
+  btns.forEach(b=>b.disabled=true);
+  if(pressed)pressed.textContent="Loading…";
+  try{
+    EXPLORE=explore;
+    const c=SETUP.course;
+    // make sure the SELECTED course's map is loaded before we build the round —
+    // never fall back to a stale/previous course
+    if(!COURSE||COURSE.name!==c.name||!COURSE.greens){
+      const note=document.getElementById("loadNote");if(note)note.textContent="Loading course map…";
+      await loadCourse(c);
+    }
+    if(!COURSE||COURSE.name!==c.name){
+      alert("Couldn't download the "+c.name+" course map — the free map server is busy.\n\nWait a few seconds and tap Play again.");
+      const note=document.getElementById("loadNote");if(note)note.textContent="Map load failed — tap Play to retry.";
+      return;
+    }
+    const hs=(COURSE&&COURSE.name===c.name&&COURSE.holesSorted.length)?COURSE.holesSorted:null;
+    const n=hs?hs.length:(c.holes||18);
+    if(!explore){
+      S.active={course:c.name,city:c.city||"",date:today(),scoring:SETUP.scoring,net:SETUP.net,
+        holes:Array.from({length:n},(_,i)=>({par:hs?(parseInt(hs[i].par)||4):4,hcap:hs?(parseInt(hs[i].hcap)||null):null,shots:[],done:false})),
+        cur:Math.min(SETUP.start-1,n-1)};
+      save();
+    }
+    closeSetup();
+    enterHole();
+  }finally{
+    STARTING=false;
+    btns.forEach(b=>b.disabled=false);
+    if(pressed&&restoreLabel!=null)pressed.textContent=restoreLabel;
   }
-  if(!COURSE||COURSE.name!==c.name){
-    alert("Couldn't download the "+c.name+" course map — the free map server is busy.\n\nWait a few seconds and tap Play again.");
-    const note=document.getElementById("loadNote");if(note)note.textContent="Map load failed — tap Play to retry.";
-    return;
-  }
-  const hs=(COURSE&&COURSE.name===c.name&&COURSE.holesSorted.length)?COURSE.holesSorted:null;
-  const n=hs?hs.length:(c.holes||18);
-  if(!explore){
-    S.active={course:c.name,city:c.city||"",date:today(),scoring:SETUP.scoring,net:SETUP.net,
-      holes:Array.from({length:n},(_,i)=>({par:hs?(parseInt(hs[i].par)||4):4,hcap:hs?(parseInt(hs[i].hcap)||null):null,shots:[],done:false})),
-      cur:Math.min(SETUP.start-1,n-1)};
-    save();
-  }
-  closeSetup();
-  enterHole();
 }
 function resumeRound(){
   EXPLORE=false;
@@ -1330,9 +1345,9 @@ function openLogSheet(presetLie){
     ${(isFirst?["tee"]:["fairway","rough","sand","recovery","green"]).map((l,i)=>`<div class="chip ${l===lie?"on":""}" data-lie="${l}" onclick="pickLie(this)">${l}</div>`).join("")}
   </div>
   <label class="fl" id="distlbl">Distance to hole (${lie==="green"?"feet":"yards"})</label>
-  <input type="number" id="dist" inputmode="decimal" value="${lie==="green"?"":distToFlag}" placeholder="0">
+  <input type="number" id="dist" inputmode="decimal" aria-label="Distance to hole" value="${lie==="green"?"":distToFlag}" placeholder="0">
   <label class="fl">Club</label>
-  <select id="club"><option value="">—</option>${S.bag.map(b=>`<option ${b.name===recClub?"selected":""}>${esc(b.name)}</option>`).join("")}</select>
+  <select id="club" aria-label="Club hit"><option value="">—</option>${S.bag.map(b=>`<option ${b.name===recClub?"selected":""}>${esc(b.name)}</option>`).join("")}</select>
   <div class="row mt">
     <button class="btn grad grow" onclick="logShot()">Log shot</button>
     ${h.shots.length?`<button class="btn" onclick="holedIt()">🕳 Holed</button>`:""}
@@ -1525,8 +1540,8 @@ function vMlm(){
   </div>
   <div class="card"><b>Manual entry</b>
     <div class="row mt">
-      <select id="lmclub" style="flex:2">${S.bag.map(b=>`<option>${esc(b.name)}</option>`).join("")}</select>
-      <input type="number" id="lmcarry" inputmode="decimal" placeholder="carry yd" style="flex:1">
+      <select id="lmclub" aria-label="Club" style="flex:2">${S.bag.map(b=>`<option>${esc(b.name)}</option>`).join("")}</select>
+      <input type="number" id="lmcarry" inputmode="decimal" aria-label="Carry distance in yards" placeholder="carry yd" style="flex:1">
       <button class="btn" onclick="lmManual()">Add</button>
     </div>
     <div class="dim small mt">Hit a shot on the MLM2Pro, read the carry off the screen, add it here.</div>
@@ -1668,6 +1683,11 @@ function exportData(){document.getElementById("io").value=JSON.stringify(S);docu
   try{navigator.clipboard.writeText(JSON.stringify(S));alert("Backup copied to clipboard.");}catch(e){}}
 function importData(){try{const d=JSON.parse(document.getElementById("io").value);if(!d.bag)throw 0;S=d;S.lm=S.lm||{};S.favs=S.favs||[];save();render();alert("Imported ✓");}catch(e){alert("Paste a valid backup first.");}}
 
+// keyboard operability for the role="button" HUD chips (Enter / Space activate)
+document.getElementById("chipRow").addEventListener("keydown",e=>{
+  const t=e.target.closest('[role="button"]');
+  if(t&&(e.key==="Enter"||e.key===" ")){e.preventDefault();t.click();}
+});
 go("golf");
 </script>
 </body>
