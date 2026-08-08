@@ -31,30 +31,32 @@ h1.title{font-size:34px;font-weight:800;text-align:center;margin:6px 0 14px}
 .btn{background:var(--panel2);border:none;color:var(--txt);border-radius:14px;padding:13px 18px;font-size:16px;font-weight:700;cursor:pointer}
 .btn.grad{background:linear-gradient(90deg,var(--teal),var(--yellow));color:#06231a}
 .btn.ghostb{background:var(--panel);color:var(--teal)}
-.btn.sm{padding:8px 12px;font-size:13px;border-radius:10px}
+.btn.sm{padding:6px 14px;font-size:13px;border-radius:10px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:4px}
 .btn:active{opacity:.75}
 input,select,textarea{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:12px;padding:12px;font-size:16px;width:100%}
 label.fl{display:block;font-size:12px;color:var(--dim);margin:10px 0 5px;text-transform:uppercase;letter-spacing:.6px;font-weight:700}
 textarea{font-family:monospace;font-size:12px;min-height:90px}
 /* pills / segmented */
 .pillseg{display:inline-flex;background:#e8ede9;border-radius:999px;padding:3px}
-.pillseg button{border:none;background:none;color:#233;font-size:16px;font-weight:700;padding:8px 22px;border-radius:999px;cursor:pointer}
+.pillseg button{border:none;background:none;color:#233;font-size:16px;font-weight:700;padding:0 22px;min-height:44px;display:inline-flex;align-items:center;border-radius:999px;cursor:pointer}
 .pillseg button.on{background:var(--yellow);color:#122}
 .seg{display:flex;gap:6px}
-.seg button{border:none;background:var(--panel2);color:var(--dim);font-size:14px;font-weight:700;padding:9px 16px;border-radius:999px;cursor:pointer}
+.seg button{border:none;background:var(--panel2);color:var(--dim);font-size:14px;font-weight:700;padding:0 18px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;cursor:pointer}
 .seg button.on{background:var(--yellow);color:#122}
 .seg button.on.teal{background:var(--teal)}
 .searchbox{display:flex;align-items:center;gap:8px;background:var(--panel);border-radius:14px;padding:0 12px;margin-bottom:12px}
 .searchbox input{background:none;border:none;padding:13px 0}
-.searchbox input:focus{outline:none}
+.searchbox input:focus:not(:focus-visible){outline:none}
 /* toggle switch */
-.switch{width:52px;height:30px;border-radius:999px;background:var(--panel2);position:relative;cursor:pointer;flex:0 0 auto}
-.switch::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#5a7466;transition:all .15s}
+.switch{width:54px;height:32px;border-radius:999px;background:var(--panel2);position:relative;cursor:pointer;flex:0 0 auto}
+/* invisible 44px hit area so the toggle meets the touch-target floor without a bulky pill */
+.switch::before{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:100%;height:44px;min-width:44px}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#5a7466;transition:all .15s}
 .switch.on{background:var(--teal)}
 .switch.on::after{left:25px;background:#fff}
 /* stepper */
 .stepper{display:flex;align-items:center;gap:14px}
-.stepper button{width:38px;height:38px;border-radius:50%;border:none;background:var(--panel2);color:var(--txt);font-size:20px;font-weight:800;cursor:pointer}
+.stepper button{width:44px;height:44px;border-radius:50%;border:none;background:var(--panel2);color:var(--txt);font-size:20px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
 .stepper b{font-size:22px;min-width:26px;text-align:center}
 /* config rows */
 .cfg{background:var(--panel);border-radius:20px;overflow:hidden;margin-bottom:12px}
@@ -109,7 +111,7 @@ nav button.on .ic{filter:drop-shadow(0 0 6px rgba(217,244,82,.5))}
 #clubPill .opt{font-size:13px;font-weight:600;color:#e8ecdc}
 #clubPill .altclub{font-size:24px;font-weight:800;color:rgba(255,255,255,.35)}
 #chipRow{position:absolute;z-index:900;bottom:calc(12px + var(--sb));left:10px;right:10px;display:flex;gap:6px;justify-content:center;align-items:stretch}
-.mchip{background:var(--hud);border:1.5px solid var(--hudline);border-radius:16px;padding:6px 13px;color:#fff;font-weight:800;font-size:17px;
+.mchip{background:var(--hud);border:1.5px solid var(--hudline);border-radius:16px;padding:6px 13px;min-height:46px;color:#fff;font-weight:800;font-size:17px;
   text-align:center;line-height:1.12;font-variant-numeric:tabular-nums;cursor:pointer;display:flex;flex-direction:column;justify-content:center}
 .mchip small{display:block;font-weight:600;font-size:11px;color:#c9d4a3}
 .mchip .yellow{color:var(--yellow)}
@@ -133,8 +135,8 @@ nav button.on .ic{filter:drop-shadow(0 0 6px rgba(217,244,82,.5))}
 .suggestChip .txt b{color:#fff;font-size:20px;font-weight:800;display:block}
 .suggestChip .txt small{color:#e7efdb;font-size:12px;font-weight:600}
 /* misc lists */
-.chips{display:flex;gap:6px;flex-wrap:wrap}
-.chip{background:var(--panel2);border:1px solid var(--line);color:var(--dim);border-radius:999px;padding:8px 15px;font-size:14px;font-weight:700;cursor:pointer}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{background:var(--panel2);border:1px solid var(--line);color:var(--dim);border-radius:999px;padding:0 16px;min-height:44px;display:inline-flex;align-items:center;font-size:14px;font-weight:700;cursor:pointer}
 .chip.on{background:var(--yellow);border-color:var(--yellow);color:#232a06}
 .shot{display:flex;align-items:center;gap:8px;padding:8px 2px;border-bottom:1px solid rgba(255,255,255,.06);font-size:15px}
 .shot .n{width:20px;color:var(--dim);font-weight:700}
@@ -144,9 +146,9 @@ nav button.on .ic{filter:drop-shadow(0 0 6px rgba(217,244,82,.5))}
 .stat{background:var(--panel2);border-radius:12px;padding:10px;text-align:center}
 .stat .v{font-size:20px;font-weight:800}
 .stat .l{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
-.scoregrid{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;font-size:11px;text-align:center}
+.scoregrid{display:grid;grid-template-columns:repeat(9,1fr);gap:4px;font-size:12px;text-align:center}
 .scoregrid .h{color:var(--dim)}
-.scoregrid .s{background:var(--panel2);border-radius:6px;padding:6px 0;font-weight:700;cursor:pointer}
+.scoregrid .s{background:var(--panel2);border-radius:8px;min-height:40px;display:flex;align-items:center;justify-content:center;font-weight:700;cursor:pointer}
 .scoregrid .s.birdie{color:var(--teal)}
 .scoregrid .s.bogey{color:var(--yellow)}
 .scoregrid .s.dbl{color:var(--red)}
@@ -156,6 +158,15 @@ nav button.on .ic{filter:drop-shadow(0 0 6px rgba(217,244,82,.5))}
 .bar .fill{position:absolute;top:0;bottom:0}
 .bar .v{width:44px;text-align:right;font-weight:700}
 .big{font-size:34px;font-weight:800}
+/* touch press feedback (the tap-highlight is suppressed, so give every control its own press) */
+.mchip,.hudBtn,.chip,.seg button,.pillseg button,.stepper button,.scoregrid .s,.rowcard,.switch,#markBtn,#holedBtn{transition:transform .08s ease}
+.mchip:active,.hudBtn:active,.chip:active,.seg button:active,.pillseg button:active,.stepper button:active,.scoregrid .s:active,.rowcard:active,.switch:active,#markBtn:active,#holedBtn:active{transform:scale(.95)}
+/* keyboard focus ring for non-touch input, without showing on tap */
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){
+  .mchip,.hudBtn,.chip,.seg button,.pillseg button,.stepper button,.scoregrid .s,.rowcard,.switch,#markBtn,#holedBtn,.switch::after{transition:none}
+  .mchip:active,.hudBtn:active,.chip:active,.seg button:active,.pillseg button:active,.stepper button:active,.scoregrid .s:active,.rowcard:active,.switch:active,#markBtn:active,#holedBtn:active{transform:none}
+}
 #markStack{position:absolute;z-index:950;left:12px;bottom:calc(150px + var(--sb));display:flex;flex-direction:column;gap:8px;align-items:center}
 #markBtn{min-width:66px;height:66px;border-radius:20px;background:var(--yellow);border:none;color:#122;
   font-size:12px;font-weight:800;display:flex;flex-direction:column;align-items:center;justify-content:center;
